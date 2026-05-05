@@ -254,7 +254,7 @@ def get_transcript(page, vid: str) -> list[dict] | None:
         "ytd-transcript-body-renderer ytd-transcript-segment-renderer",
     ]:
         try:
-            page.wait_for_selector(seg_sel, timeout=20000)
+            page.wait_for_selector(seg_sel, timeout=45000)
             panel_loaded = True
             matched_sel = seg_sel
             break
