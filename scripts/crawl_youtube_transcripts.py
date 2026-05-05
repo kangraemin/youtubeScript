@@ -117,7 +117,7 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
                 pub_dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
                 if cutoff and pub_dt < cutoff:
                     return videos
-                videos.append({"url": f"https://www.youtube.com/watch?v={vid}", "vid": vid, "title": title, "meta": published_at[:10]})
+                videos.append({"url": f"https://www.youtube.com/watch?v={vid}", "vid": vid, "title": title, "meta": published_at[:10], "channel": ch["name"]})
                 if max_videos > 0 and len(videos) >= max_videos:
                     return videos
             req = youtube.search().list_next(req, resp)
@@ -138,7 +138,7 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
                 pub_dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
                 if cutoff and pub_dt < cutoff:
                     return videos
-                videos.append({"url": f"https://www.youtube.com/watch?v={vid}", "vid": vid, "title": title, "meta": published_at[:10]})
+                videos.append({"url": f"https://www.youtube.com/watch?v={vid}", "vid": vid, "title": title, "meta": published_at[:10], "channel": ch["name"]})
                 if max_videos > 0 and len(videos) >= max_videos:
                     return videos
             req = youtube.playlistItems().list_next(req, resp)
