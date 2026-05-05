@@ -98,8 +98,12 @@ const copyToClipboard = (text) => {
   }
 };
 
+// 세션 내 메모리 캐시 (페이지 새로고침 전까지 유지)
+const CACHE = { channels: null, allVideos: null, channelVideos: {} };
+
 // 전체 채널 목록 페치 (pagination으로 GROUP BY 대체)
 const fetchAllChannels = async () => {
+  if (CACHE.channels) return CACHE.channels;
   let allRows = [];
   let from = 0;
   const PAGE = 1000;
@@ -121,7 +125,8 @@ const fetchAllChannels = async () => {
     }
     map[r.channel_slug].cnt++;
   });
-  return Object.values(map).sort((a, b) => a.channel.localeCompare(b.channel, 'ko'));
+  CACHE.channels = Object.values(map).sort((a, b) => a.channel.localeCompare(b.channel, 'ko'));
+  return CACHE.channels;
 };
 
 // ─── 아이콘 ─────────────────────────────────────────────────────────────────
@@ -257,13 +262,14 @@ function HomeScreen({ onSelectChannel, onSelectVideo, onOpenSearch }) {
 
   React.useEffect(() => {
     if (viewMode !== 'all' || allFetched) return;
+    if (CACHE.allVideos) { setAllVideos(CACHE.allVideos); setAllFetched(true); return; }
     setLoadingAll(true);
     sb.from('transcripts')
       .select('vid,channel,channel_slug,title,published_at,transcript,url')
       .order('published_at', { ascending:false, nullsFirst:false })
       .limit(100)
       .then(({ data, error }) => {
-        if (!error) setAllVideos(data || []);
+        if (!error) { CACHE.allVideos = data || []; setAllVideos(CACHE.allVideos); }
         setAllFetched(true);
         setLoadingAll(false);
       });
@@ -364,14 +370,16 @@ function VideoListScreen({ channel, onBack, onSelectVideo }) {
   const [err, setErr] = React.useState(null);
 
   React.useEffect(() => {
+    const slug = channel.channel_slug;
+    if (CACHE.channelVideos[slug]) { setVideos(CACHE.channelVideos[slug]); setLoading(false); return; }
     sb.from('transcripts')
       .select('vid,channel,channel_slug,title,published_at,transcript,url')
-      .eq('channel_slug', channel.channel_slug)
+      .eq('channel_slug', slug)
       .order('published_at', { ascending:false, nullsFirst:false })
       .limit(100)
       .then(({ data, error }) => {
         if (error) setErr(error.message);
-        else setVideos(data || []);
+        else { CACHE.channelVideos[slug] = data || []; setVideos(CACHE.channelVideos[slug]); }
         setLoading(false);
       });
   }, [channel.channel_slug]);
