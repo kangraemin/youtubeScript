@@ -1,0 +1,5 @@
+supabase
+anthropic
+google-api-python-client
+requests
+python-dotenv
