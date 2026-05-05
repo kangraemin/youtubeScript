@@ -424,6 +424,17 @@ function ScriptDetailScreen({ video, onBack, backLabel }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleDownload = () => {
+    const content = `${video.title}\n${video.url || ''}\n\n${video.transcript || ''}`;
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${video.title.replace(/[/\\?%*:|"<>]/g, '_').slice(0, 80)}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const ytUrl = video.url || `https://youtube.com/watch?v=${video.vid}`;
 
   return (
@@ -436,17 +447,27 @@ function ScriptDetailScreen({ video, onBack, backLabel }) {
             cursor:'pointer', fontSize:14, fontFamily:'inherit',
             maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
           }}>{Icon.back(20)} {backLabel || video.channel || '뒤로'}</button>
-          <button onClick={handleCopy} style={{
-            display:'flex', alignItems:'center', gap:6, padding:'7px 12px',
-            background: copied ? '#1f3a25' : T.bg3,
-            border:`1px solid ${copied ? '#2c5036' : T.borderLight}`,
-            borderRadius:8, color: copied ? '#7fd99a' : T.text,
-            cursor:'pointer', fontSize:13, fontWeight:500, fontFamily:'inherit',
-            transition:'all 0.15s', marginRight:8,
-          }}>
-            {copied ? Icon.check(15) : Icon.copy(15)}
-            {copied ? '복사됨' : '복사'}
-          </button>
+          <div style={{ display:'flex', gap:6, marginRight:8 }}>
+            <button onClick={handleDownload} style={{
+              display:'flex', alignItems:'center', gap:5, padding:'7px 11px',
+              background:T.bg3, border:`1px solid ${T.borderLight}`,
+              borderRadius:8, color:T.textDim,
+              cursor:'pointer', fontSize:13, fontWeight:500, fontFamily:'inherit',
+            }}>
+              {Icon.external(14)} txt
+            </button>
+            <button onClick={handleCopy} style={{
+              display:'flex', alignItems:'center', gap:6, padding:'7px 12px',
+              background: copied ? '#1f3a25' : T.bg3,
+              border:`1px solid ${copied ? '#2c5036' : T.borderLight}`,
+              borderRadius:8, color: copied ? '#7fd99a' : T.text,
+              cursor:'pointer', fontSize:13, fontWeight:500, fontFamily:'inherit',
+              transition:'all 0.15s',
+            }}>
+              {copied ? Icon.check(15) : Icon.copy(15)}
+              {copied ? '복사됨' : '복사'}
+            </button>
+          </div>
         </div>
       </div>
 
