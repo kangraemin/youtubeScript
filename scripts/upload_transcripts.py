@@ -20,6 +20,17 @@ TRANSCRIPTS_DIR = _ROOT / "rawdata" / "transcripts"
 BATCH_SIZE = 100
 
 
+def _parse_date(val: str | None) -> str | None:
+    if not val:
+        return None
+    try:
+        from datetime import date
+        date.fromisoformat(val)
+        return val
+    except (ValueError, TypeError):
+        return None
+
+
 def load_channel(slug_dir: Path) -> list[dict]:
     list_file = slug_dir / "_list.json"
     if not list_file.exists():
@@ -40,7 +51,7 @@ def load_channel(slug_dir: Path) -> list[dict]:
             "channel": v.get("channel", ""),
             "channel_slug": slug_dir.name,
             "title": v.get("title", ""),
-            "published_at": v.get("meta") or None,
+            "published_at": _parse_date(v.get("meta")),
             "collected_at": v.get("collected_at") or None,
             "transcript": transcript,
             "url": v.get("url", ""),
