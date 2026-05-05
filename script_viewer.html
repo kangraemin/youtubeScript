@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>스크립트 뷰어</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #08090b; }
+    #root { height: 100%; min-height: 100dvh; }
+    body {
+      font-family: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      color: #e8e9ec;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overscroll-behavior: none;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    button { font-family: inherit; }
+    a { font-family: inherit; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #2a2d33; border-radius: 3px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb:hover { background: #3a3d44; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { createClient } = window.supabase;
+const sb = createClient(
+  'https://hitdytgrpsdtrkarexyq.supabase.co',
+  'sb_publishable_Rv3CTiU0TtSV8TOOejk-zQ_JaswNryq'
+);
+
+// ─── 테마 ───────────────────────────────────────────────────────────────────
+const T = {
+  bg: '#0e0f12', bg2: '#15171c', bg3: '#1c1f25', bg4: '#23262d',
+  border: '#26292f', borderLight: '#2e3138',
+  text: '#e8e9ec', textDim: '#9ba0a8', textFaint: '#6b6f78',
+  accent: '#e8584d', accentDim: '#3a1f1d',
+  highlight: '#5c4520', highlightText: '#ffd58a',
+};
+
+// ─── 유틸 ───────────────────────────────────────────────────────────────────
+const PALETTE = [
+  '#e8584d','#4d9de0','#3bb273','#f4a259','#7b6cf6',
+  '#e84393','#26c6da','#ff7043','#66bb6a','#ab47bc',
+  '#ec407a','#29b6f6','#ffa726',
+];
+const hashColor = (slug) => {
+  const n = [...(slug || 'x')].reduce((a, c) => a + c.charCodeAt(0), 0);
+  return PALETTE[n % PALETTE.length];
+};
+
+const fmtDate = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const now = new Date();
+  const diffDays = Math.floor((now - d) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return '오늘';
+  if (diffDays === 1) return '어제';
+  if (diffDays < 7) return `${diffDays}일 전`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}주 전`;
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}.${m}.${day}`;
+};
+
+const previewText = (text, len = 110) => {
+  if (!text) return '';
+  const flat = text.replace(/\n+/g, ' ').trim();
+  return flat.length > len ? flat.slice(0, len) + '…' : flat;
+};
+
+const copyToClipboard = (text) => {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text || '').catch(() => {});
+  } else {
+    const ta = document.createElement('textarea');
+    ta.value = text || '';
+    ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+};
+
+// 전체 채널 목록 페치 (pagination으로 GROUP BY 대체)
+const fetchAllChannels = async () => {
+  let allRows = [];
+  let from = 0;
+  const PAGE = 1000;
+  while (true) {
+    const { data, error } = await sb
+      .from('transcripts')
+      .select('channel, channel_slug')
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    allRows = allRows.concat(data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  const map = {};
+  allRows.forEach(r => {
+    if (!map[r.channel_slug]) {
+      map[r.channel_slug] = { channel: r.channel, channel_slug: r.channel_slug, cnt: 0 };
+    }
+    map[r.channel_slug].cnt++;
+  });
+  return Object.values(map).sort((a, b) => a.channel.localeCompare(b.channel, 'ko'));
+};
+
+// ─── 아이콘 ─────────────────────────────────────────────────────────────────
+const Icon = {
+  search: (s=18) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>,
+  back:   (s=22) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"   strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>,
+  copy:   (s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>,
+  check:  (s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 13l4 4L19 7"/></svg>,
+  external:(s=13)=> <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M19 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4"/></svg>,
+  close:  (s=18) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"   strokeLinecap="round" strokeLinejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>,
+  chevron:(s=14) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"   strokeLinecap="round" strokeLinejoin="round"><path d="M9 6l6 6-6 6"/></svg>,
+  play:   (s=13) => <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor"><path d="M7 5v14l12-7z"/></svg>,
+  grid:   (s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>,
+  list:   (s=16) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>,
+};
+
+// ─── 공통 컴포넌트 ───────────────────────────────────────────────────────────
+function Spinner() {
+  return (
+    <div style={{ display:'flex', justifyContent:'center', alignItems:'center', padding:48 }}>
+      <div style={{
+        width:28, height:28,
+        border:`2.5px solid ${T.border}`,
+        borderTop:`2.5px solid ${T.accent}`,
+        borderRadius:'50%',
+        animation:'spin 0.8s linear infinite',
+      }}/>
+    </div>
+  );
+}
+
+function ErrMsg({ msg }) {
+  return <div style={{ padding:'24px 20px', color:T.accent, fontSize:13 }}>오류: {msg}</div>;
+}
+
+function Avatar({ slug, name, size=36 }) {
+  const color = hashColor(slug || '');
+  const ch = (name || '?')[0];
+  return (
+    <div style={{
+      width:size, height:size, borderRadius:size/2,
+      background:`linear-gradient(135deg,${color},${color}cc)`,
+      color:'#fff', fontWeight:700, fontSize:Math.round(size*0.44),
+      display:'flex', alignItems:'center', justifyContent:'center',
+      flexShrink:0, letterSpacing:'-0.02em', userSelect:'none',
+    }}>{ch}</div>
+  );
+}
+
+function CopyBtn({ text, size='sm', stop=true }) {
+  const [copied, setCopied] = React.useState(false);
+  const onClick = (e) => {
+    if (stop) e.stopPropagation();
+    copyToClipboard(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+  const sm = size === 'sm';
+  return (
+    <button onClick={onClick} style={{
+      display:'inline-flex', alignItems:'center', gap:5,
+      padding: sm ? '6px 10px' : '7px 12px',
+      background: copied ? '#1f3a25' : T.bg3,
+      border:`1px solid ${copied ? '#2c5036' : T.borderLight}`,
+      borderRadius:7, color: copied ? '#7fd99a' : T.textDim,
+      cursor:'pointer', fontSize: sm ? 12 : 13, fontWeight:500,
+      fontFamily:'inherit', transition:'all 0.15s', flexShrink:0,
+    }}>
+      {copied ? Icon.check(sm?13:15) : Icon.copy(sm?13:15)}
+      {copied ? '복사됨' : '복사'}
+    </button>
+  );
+}
+
+function VideoCard({ video, mode='channel', onSelect }) {
+  const [hover, setHover] = React.useState(false);
+  return (
+    <div
+      onClick={() => onSelect(video)}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        padding:'18px 20px', borderBottom:`1px solid ${T.border}`,
+        cursor:'pointer', color:T.text,
+        background: hover ? T.bg2 : 'transparent',
+        transition:'background 0.12s',
+        animation:'fadeIn 0.15s ease',
+      }}
+    >
+      {mode === 'all' && (
+        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
+          <Avatar slug={video.channel_slug} name={video.channel} size={20}/>
+          <span style={{ fontSize:12, color:T.textDim, fontWeight:500 }}>{video.channel}</span>
+          <span style={{ color:T.borderLight, fontSize:10 }}>·</span>
+          <span style={{ fontSize:11, color:T.textFaint, fontFamily:'JetBrains Mono,monospace' }}>
+            {fmtDate(video.published_at)}
+          </span>
+        </div>
+      )}
+      <div style={{
+        fontSize:15.5, fontWeight:600, lineHeight:1.4, marginBottom:8, letterSpacing:'-0.01em',
+      }}>{video.title}</div>
+      <div style={{
+        fontSize:13, color:T.textDim, lineHeight:1.55, marginBottom:12,
+        display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden',
+      }}>{previewText(video.transcript, 140)}</div>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+        <span style={{ fontSize:11.5, color:T.textFaint, fontFamily:'JetBrains Mono,monospace' }}>
+          {mode === 'channel' ? fmtDate(video.published_at) : ''}
+        </span>
+        <CopyBtn text={video.transcript}/>
+      </div>
+    </div>
+  );
+}
+
+// ─── 화면 1: 홈 ─────────────────────────────────────────────────────────────
+function HomeScreen({ onSelectChannel, onSelectVideo, onOpenSearch }) {
+  const [viewMode, setViewMode] = React.useState('channels');
+  const [channels, setChannels] = React.useState([]);
+  const [allVideos, setAllVideos] = React.useState([]);
+  const [loadingCh, setLoadingCh] = React.useState(true);
+  const [loadingAll, setLoadingAll] = React.useState(false);
+  const [allFetched, setAllFetched] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+
+  React.useEffect(() => {
+    fetchAllChannels()
+      .then(setChannels)
+      .catch(e => setErr(e.message))
+      .finally(() => setLoadingCh(false));
+  }, []);
+
+  React.useEffect(() => {
+    if (viewMode !== 'all' || allFetched) return;
+    setLoadingAll(true);
+    sb.from('transcripts')
+      .select('vid,channel,channel_slug,title,published_at,transcript,url')
+      .order('published_at', { ascending:false, nullsFirst:false })
+      .limit(100)
+      .then(({ data, error }) => {
+        if (!error) setAllVideos(data || []);
+        setAllFetched(true);
+        setLoadingAll(false);
+      });
+  }, [viewMode, allFetched]);
+
+  const totalVids = channels.reduce((s, c) => s + c.cnt, 0);
+
+  return (
+    <div style={{ background:T.bg, height:'100%', display:'flex', flexDirection:'column', color:T.text }}>
+      <div style={{ padding:'16px 20px 14px', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
+        <div style={{ display:'flex', alignItems:'baseline', justifyContent:'space-between', marginBottom:12 }}>
+          <h1 style={{ margin:0, fontSize:24, fontWeight:700, letterSpacing:'-0.02em' }}>스크립트</h1>
+          <span style={{ fontSize:11, color:T.textFaint, fontFamily:'JetBrains Mono,monospace' }}>
+            {loadingCh ? '…' : `${channels.length} ch · ${totalVids} videos`}
+          </span>
+        </div>
+        <button onClick={onOpenSearch} style={{
+          width:'100%', display:'flex', alignItems:'center', gap:10,
+          padding:'11px 14px', background:T.bg3, border:`1px solid ${T.border}`,
+          borderRadius:10, color:T.textDim, fontSize:14, cursor:'pointer',
+          fontFamily:'inherit', textAlign:'left', marginBottom:12,
+        }}>
+          <span style={{ color:T.textFaint }}>{Icon.search(16)}</span>
+          모든 스크립트에서 검색
+        </button>
+        <div style={{ display:'flex', padding:3, background:T.bg3, border:`1px solid ${T.border}`, borderRadius:9, gap:2 }}>
+          {[{id:'channels',label:'채널별',icon:Icon.grid(13)},{id:'all',label:'전체 목록',icon:Icon.list(14)}].map(opt => (
+            <button key={opt.id} onClick={() => setViewMode(opt.id)} style={{
+              flex:1, display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+              padding:'7px 10px', borderRadius:6, border:'none',
+              background: viewMode===opt.id ? T.bg4 : 'transparent',
+              color: viewMode===opt.id ? T.text : T.textFaint,
+              fontWeight: viewMode===opt.id ? 600 : 500,
+              fontSize:13, cursor:'pointer', fontFamily:'inherit', transition:'all 0.15s',
+              boxShadow: viewMode===opt.id ? '0 1px 2px rgba(0,0,0,0.3)' : 'none',
+            }}>{opt.icon}{opt.label}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ flex:1, overflow:'auto' }}>
+        {viewMode === 'channels' && (
+          <>
+            {loadingCh && <Spinner/>}
+            {err && <ErrMsg msg={err}/>}
+            {!loadingCh && !err && (
+              <>
+                <div style={{ padding:'14px 20px 10px', fontSize:11, color:T.textFaint, fontWeight:600, letterSpacing:'0.08em' }}>
+                  구독 채널 {channels.length}
+                </div>
+                {channels.map(ch => (
+                  <button key={ch.channel_slug} onClick={() => onSelectChannel(ch)} style={{
+                    width:'100%', display:'flex', alignItems:'center', gap:14,
+                    padding:'13px 20px', background:'transparent', border:'none',
+                    borderBottom:`1px solid ${T.border}`, cursor:'pointer',
+                    fontFamily:'inherit', textAlign:'left', color:T.text,
+                  }}>
+                    <Avatar slug={ch.channel_slug} name={ch.channel} size={42}/>
+                    <div style={{ flex:1, minWidth:0 }}>
+                      <div style={{ fontSize:15, fontWeight:500, marginBottom:3 }}>{ch.channel}</div>
+                      <div style={{ fontSize:12, color:T.textFaint, fontFamily:'JetBrains Mono,monospace' }}>
+                        @{ch.channel_slug} · 영상 {ch.cnt}
+                      </div>
+                    </div>
+                    <span style={{ color:T.textFaint }}>{Icon.chevron()}</span>
+                  </button>
+                ))}
+                <div style={{ height:24 }}/>
+              </>
+            )}
+          </>
+        )}
+        {viewMode === 'all' && (
+          <>
+            {loadingAll && <Spinner/>}
+            {!loadingAll && (
+              <>
+                <div style={{ padding:'14px 20px 8px', fontSize:11, color:T.textFaint, fontWeight:600, letterSpacing:'0.08em' }}>
+                  최신순 · 영상 {allVideos.length}편
+                </div>
+                {allVideos.map(v => (
+                  <VideoCard key={v.vid} video={v} mode="all" onSelect={onSelectVideo}/>
+                ))}
+                <div style={{ height:24 }}/>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── 화면 2: 채널별 영상 목록 ────────────────────────────────────────────────
+function VideoListScreen({ channel, onBack, onSelectVideo }) {
+  const [videos, setVideos] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [err, setErr] = React.useState(null);
+
+  React.useEffect(() => {
+    sb.from('transcripts')
+      .select('vid,channel,channel_slug,title,published_at,transcript,url')
+      .eq('channel_slug', channel.channel_slug)
+      .order('published_at', { ascending:false, nullsFirst:false })
+      .limit(100)
+      .then(({ data, error }) => {
+        if (error) setErr(error.message);
+        else setVideos(data || []);
+        setLoading(false);
+      });
+  }, [channel.channel_slug]);
+
+  return (
+    <div style={{ background:T.bg, height:'100%', display:'flex', flexDirection:'column', color:T.text }}>
+      <div style={{ padding:'4px 12px 16px 8px', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
+        <button onClick={onBack} style={{
+          display:'flex', alignItems:'center', gap:4, padding:'8px',
+          background:'transparent', border:'none', color:T.textDim,
+          cursor:'pointer', fontSize:14, fontFamily:'inherit', marginBottom:4,
+        }}>{Icon.back(20)} 채널</button>
+        <div style={{ display:'flex', alignItems:'center', gap:14, padding:'0 12px' }}>
+          <Avatar slug={channel.channel_slug} name={channel.channel} size={48}/>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:18, fontWeight:600, letterSpacing:'-0.01em' }}>{channel.channel}</div>
+            <div style={{ fontSize:12, color:T.textFaint, fontFamily:'JetBrains Mono,monospace', marginTop:3 }}>
+              @{channel.channel_slug} · {loading ? '…' : `영상 ${videos.length}편`}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{ flex:1, overflow:'auto' }}>
+        {loading && <Spinner/>}
+        {err && <ErrMsg msg={err}/>}
+        {!loading && !err && videos.map(v => (
+          <VideoCard key={v.vid} video={v} mode="channel" onSelect={onSelectVideo}/>
+        ))}
+        {!loading && <div style={{ height:24 }}/>}
+      </div>
+    </div>
+  );
+}
+
+// ─── 화면 3: 스크립트 상세 ───────────────────────────────────────────────────
+function ScriptDetailScreen({ video, onBack, backLabel }) {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = () => {
+    copyToClipboard(video.transcript);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const ytUrl = video.url || `https://youtube.com/watch?v=${video.vid}`;
+
+  return (
+    <div style={{ background:T.bg, height:'100%', display:'flex', flexDirection:'column', color:T.text }}>
+      <div style={{ padding:'4px 8px 12px', borderBottom:`1px solid ${T.border}`, flexShrink:0 }}>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+          <button onClick={onBack} style={{
+            display:'flex', alignItems:'center', gap:4, padding:'8px',
+            background:'transparent', border:'none', color:T.textDim,
+            cursor:'pointer', fontSize:14, fontFamily:'inherit',
+            maxWidth:220, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+          }}>{Icon.back(20)} {backLabel || video.channel || '뒤로'}</button>
+          <button onClick={handleCopy} style={{
+            display:'flex', alignItems:'center', gap:6, padding:'7px 12px',
+            background: copied ? '#1f3a25' : T.bg3,
+            border:`1px solid ${copied ? '#2c5036' : T.borderLight}`,
+            borderRadius:8, color: copied ? '#7fd99a' : T.text,
+            cursor:'pointer', fontSize:13, fontWeight:500, fontFamily:'inherit',
+            transition:'all 0.15s', marginRight:8,
+          }}>
+            {copied ? Icon.check(15) : Icon.copy(15)}
+            {copied ? '복사됨' : '복사'}
+          </button>
+        </div>
+      </div>
+
+      <div style={{ flex:1, overflow:'auto' }}>
+        <div style={{ padding:'20px 22px 18px', borderBottom:`1px solid ${T.border}` }}>
+          <h1 style={{
+            margin:'0 0 14px', fontSize:20, fontWeight:700, lineHeight:1.35, letterSpacing:'-0.015em',
+          }}>{video.title}</h1>
+          <div style={{ display:'flex', alignItems:'center', gap:10, fontSize:13, color:T.textDim, marginBottom:16 }}>
+            <Avatar slug={video.channel_slug} name={video.channel} size={24}/>
+            <span style={{ fontWeight:500 }}>{video.channel}</span>
+            <span style={{ color:T.borderLight }}>·</span>
+            <span style={{ fontFamily:'JetBrains Mono,monospace', fontSize:12 }}>{fmtDate(video.published_at)}</span>
+          </div>
+          <a href={ytUrl} target="_blank" rel="noopener noreferrer" style={{
+            display:'inline-flex', alignItems:'center', gap:7, padding:'8px 14px',
+            background:T.accent, color:'#fff', borderRadius:8,
+            fontSize:13, fontWeight:500, textDecoration:'none',
+          }}>
+            {Icon.play(12)} YouTube에서 보기
+            <span style={{ opacity:0.8 }}>{Icon.external(12)}</span>
+          </a>
+        </div>
+        <div style={{ padding:'24px 22px 40px' }}>
+          {(video.transcript || '스크립트가 없습니다.').split('\n\n').map((para, i) => (
+            <p key={i} style={{
+              margin:'0 0 18px', fontSize:15.5, lineHeight:1.75, color:'#d6d8dc', letterSpacing:'-0.005em',
+            }}>{para}</p>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── 화면 4: 검색 ───────────────────────────────────────────────────────────
+function SearchScreen({ onClose, onJumpToScript }) {
+  const [query, setQuery] = React.useState('');
+  const [results, setResults] = React.useState([]);
+  const [searching, setSearching] = React.useState(false);
+  const inputRef = React.useRef(null);
+
+  React.useEffect(() => { inputRef.current?.focus(); }, []);
+
+  React.useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setResults([]); return; }
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const { data } = await sb
+          .from('transcripts')
+          .select('vid,channel,channel_slug,title,published_at,transcript,url')
+          .or(`title.ilike.%${q}%,transcript.ilike.%${q}%`)
+          .limit(30);
+
+        const ql = q.toLowerCase();
+        const processed = (data || []).map(v => {
+          const t = v.transcript || '';
+          const idx = t.toLowerCase().indexOf(ql);
+          let snippet = '';
+          if (idx >= 0) {
+            const s = Math.max(0, idx - 30);
+            const e = Math.min(t.length, idx + q.length + 60);
+            snippet = (s > 0 ? '…' : '') + t.slice(s, e) + (e < t.length ? '…' : '');
+          } else {
+            snippet = t.slice(0, 90) + '…';
+          }
+          return { ...v, snippet };
+        });
+        setResults(processed);
+      } catch (_) {
+        setResults([]);
+      } finally {
+        setSearching(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const hl = (text, q) => {
+    if (!q || !text) return text;
+    const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const parts = text.split(new RegExp(`(${esc})`, 'gi'));
+    return parts.map((p, i) =>
+      p.toLowerCase() === q.toLowerCase()
+        ? <mark key={i} style={{ background:T.highlight, color:T.highlightText, padding:'1px 2px', borderRadius:2 }}>{p}</mark>
+        : p
+    );
+  };
+
+  return (
+    <div style={{ background:T.bg, height:'100%', display:'flex', flexDirection:'column', color:T.text }}>
+      <div style={{ padding:'8px 14px 12px', borderBottom:`1px solid ${T.border}`, display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+        <div style={{
+          flex:1, display:'flex', alignItems:'center', gap:10,
+          padding:'10px 14px', background:T.bg3, border:`1px solid ${T.borderLight}`, borderRadius:10,
+        }}>
+          <span style={{ color:T.textFaint }}>{Icon.search(16)}</span>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="키워드 입력 (모든 채널 스크립트)"
+            style={{ flex:1, background:'transparent', border:'none', outline:'none', color:T.text, fontSize:14, fontFamily:'inherit' }}
+          />
+          {query && (
+            <button onClick={() => setQuery('')} style={{ background:'transparent', border:'none', color:T.textFaint, cursor:'pointer', padding:0, display:'flex' }}>
+              {Icon.close(16)}
+            </button>
+          )}
+        </div>
+        <button onClick={onClose} style={{ padding:'8px 4px', background:'transparent', border:'none', color:T.textDim, cursor:'pointer', fontSize:14, fontFamily:'inherit' }}>
+          취소
+        </button>
+      </div>
+
+      <div style={{ flex:1, overflow:'auto' }}>
+        {!query.trim() && (
+          <div style={{ padding:'40px 24px', textAlign:'center', color:T.textFaint, fontSize:13, lineHeight:1.6 }}>
+            제목 또는 스크립트 본문에서<br/>키워드를 검색합니다
+          </div>
+        )}
+        {query.trim().length > 0 && query.trim().length < 2 && (
+          <div style={{ padding:'40px 24px', textAlign:'center', color:T.textFaint, fontSize:13 }}>
+            2자 이상 입력해주세요
+          </div>
+        )}
+        {searching && <Spinner/>}
+        {!searching && query.trim().length >= 2 && results.length === 0 && (
+          <div style={{ padding:'40px 24px', textAlign:'center', color:T.textFaint, fontSize:13 }}>
+            "{query}"에 대한 결과가 없습니다
+          </div>
+        )}
+        {!searching && results.length > 0 && (
+          <div style={{ padding:'12px 0 4px 20px', fontSize:11, color:T.textFaint, fontFamily:'JetBrains Mono,monospace', letterSpacing:'0.05em' }}>
+            {results.length} RESULTS
+          </div>
+        )}
+        {!searching && results.map(r => (
+          <div
+            key={r.vid}
+            onClick={() => onJumpToScript(r)}
+            onMouseEnter={e => e.currentTarget.style.background = T.bg2}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            style={{ padding:'14px 20px', borderBottom:`1px solid ${T.border}`, cursor:'pointer', color:T.text }}
+          >
+            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+              <Avatar slug={r.channel_slug} name={r.channel} size={18}/>
+              <span style={{ fontSize:12, color:T.textDim, fontWeight:500 }}>{r.channel}</span>
+              <span style={{ color:T.borderLight, fontSize:10 }}>·</span>
+              <span style={{ fontSize:11, color:T.textFaint, fontFamily:'JetBrains Mono,monospace' }}>{fmtDate(r.published_at)}</span>
+            </div>
+            <div style={{ fontSize:14, fontWeight:500, lineHeight:1.4, marginBottom:6 }}>{hl(r.title, query.trim())}</div>
+            <div style={{ fontSize:13, color:T.textDim, lineHeight:1.55, marginBottom:10 }}>{hl(r.snippet, query.trim())}</div>
+            <div style={{ display:'flex', justifyContent:'flex-end' }}>
+              <CopyBtn text={r.transcript}/>
+            </div>
+          </div>
+        ))}
+        <div style={{ height:24 }}/>
+      </div>
+    </div>
+  );
+}
+
+// ─── 앱 라우터 ───────────────────────────────────────────────────────────────
+function App() {
+  const [route, setRoute] = React.useState({ name:'home' });
+  const [searchOpen, setSearchOpen] = React.useState(false);
+
+  const goBack = () => {
+    if (route.name === 'detail') {
+      if (route.from === 'channel') setRoute({ name:'videos', channel:route.channel });
+      else setRoute({ name:'home' });
+    } else if (route.name === 'videos') {
+      setRoute({ name:'home' });
+    }
+  };
+
+  return (
+    <div style={{ position:'relative', width:'100%', height:'100%', overflow:'hidden', background:T.bg }}>
+      {route.name === 'home' && (
+        <HomeScreen
+          onSelectChannel={(ch) => setRoute({ name:'videos', channel:ch })}
+          onSelectVideo={(video) => setRoute({ name:'detail', video, from:'all' })}
+          onOpenSearch={() => setSearchOpen(true)}
+        />
+      )}
+      {route.name === 'videos' && route.channel && (
+        <VideoListScreen
+          channel={route.channel}
+          onBack={goBack}
+          onSelectVideo={(video) => setRoute({ name:'detail', video, from:'channel', channel:route.channel })}
+        />
+      )}
+      {route.name === 'detail' && route.video && (
+        <ScriptDetailScreen
+          video={route.video}
+          onBack={goBack}
+          backLabel={route.from === 'all' ? '전체 목록' : (route.channel?.channel || '뒤로')}
+        />
+      )}
+      {searchOpen && (
+        <div style={{ position:'absolute', inset:0, zIndex:10 }}>
+          <SearchScreen
+            onClose={() => setSearchOpen(false)}
+            onJumpToScript={(video) => {
+              setSearchOpen(false);
+              setRoute({ name:'detail', video, from:'all' });
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
