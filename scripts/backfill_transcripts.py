@@ -14,9 +14,11 @@ from datetime import datetime
 from pathlib import Path
 
 from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
+from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable, IpBlocked
 
 TRANSCRIPTS_DIR = Path(__file__).resolve().parent.parent / "rawdata" / "transcripts"
+SLEEP_BETWEEN = 1.5   # 요청 간 딜레이 (초) — IP 블록 방지
+IP_BLOCK_WAIT = 120   # IP 블록 시 대기 시간 (초)
 
 
 def fmt_timestamp(seconds: float) -> str:
@@ -27,17 +29,18 @@ def fmt_timestamp(seconds: float) -> str:
 
 def fetch_transcript(api, vid: str) -> list[dict] | None:
     try:
-        tl = api.list(vid)
-        # prefer manual ko, then auto ko, then any
         for lang in ['ko', 'ko-KR']:
             try:
                 t = api.fetch(vid, languages=[lang])
                 return list(t)
+            except (NoTranscriptFound, TranscriptsDisabled, VideoUnavailable):
+                raise
             except Exception:
                 pass
-        # fallback: first available
         t = api.fetch(vid)
         return list(t)
+    except IpBlocked:
+        raise
     except (TranscriptsDisabled, VideoUnavailable, NoTranscriptFound):
         return None
     except Exception as e:
@@ -93,7 +96,17 @@ def main():
                 print(f"  dry: {vid}")
                 continue
 
-            segs = fetch_transcript(api, vid)
+            try:
+                segs = fetch_transcript(api, vid)
+            except IpBlocked:
+                print(f"  [IP 블록] {IP_BLOCK_WAIT}초 대기 후 재시도...", flush=True)
+                time.sleep(IP_BLOCK_WAIT)
+                try:
+                    segs = fetch_transcript(api, vid)
+                except IpBlocked:
+                    print(f"  [IP 블록 지속] 중단", flush=True)
+                    break
+
             if segs:
                 save_txt(ch_dir, vid, v, segs)
                 ok += 1
@@ -101,7 +114,7 @@ def main():
                     print(f"  [{ch_dir.name}] {i+1}/{len(missing)} ok={ok} fail={fail}", flush=True)
             else:
                 fail += 1
-            time.sleep(0.3)
+            time.sleep(SLEEP_BETWEEN)
 
         print(f"  [{ch_dir.name}] 완료: ok={ok} fail={fail}")
         grand_ok += ok
