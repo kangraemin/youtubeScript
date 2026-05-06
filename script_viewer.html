@@ -65,17 +65,17 @@ const hashColor = (slug) => {
 
 const fmtDate = (iso) => {
   if (!iso) return '';
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return '';
-  const now = new Date();
-  const diffDays = Math.floor((now - d) / (1000 * 60 * 60 * 24));
+  const dateStr = iso.slice(0, 10);
+  if (!dateStr) return '';
+  // KST(UTC+9) 기준 오늘 날짜
+  const todayKST = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const diffDays = Math.round((new Date(todayKST) - new Date(dateStr)) / (1000 * 60 * 60 * 24));
   if (diffDays === 0) return '오늘';
   if (diffDays === 1) return '어제';
   if (diffDays < 7) return `${diffDays}일 전`;
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}주 전`;
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}.${m}.${day}`;
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)}개월 전`;
+  return dateStr.replace(/-/g, '.');
 };
 
 const previewText = (text, len = 110) => {
@@ -203,41 +203,58 @@ function CopyBtn({ text, size='sm', stop=true }) {
 
 function VideoCard({ video, mode='channel', onSelect }) {
   const [hover, setHover] = React.useState(false);
+  const thumb = `https://img.youtube.com/vi/${video.vid}/mqdefault.jpg`;
   return (
     <div
       onClick={() => onSelect(video)}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        padding:'18px 20px', borderBottom:`1px solid ${T.border}`,
-        cursor:'pointer', color:T.text,
+        borderBottom:`1px solid ${T.border}`, cursor:'pointer', color:T.text,
         background: hover ? T.bg2 : 'transparent',
-        transition:'background 0.12s',
-        animation:'fadeIn 0.15s ease',
+        transition:'background 0.12s', animation:'fadeIn 0.15s ease',
       }}
     >
-      {mode === 'all' && (
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:10 }}>
-          <Avatar slug={video.channel_slug} name={video.channel} size={20}/>
-          <span style={{ fontSize:12, color:T.textDim, fontWeight:500 }}>{video.channel}</span>
-          <span style={{ color:T.borderLight, fontSize:10 }}>·</span>
+      {/* 썸네일 */}
+      <div style={{ position:'relative', width:'100%', paddingTop:'56.25%', background:T.bg3, overflow:'hidden' }}>
+        <img
+          src={thumb}
+          alt=""
+          style={{ position:'absolute', top:0, left:0, width:'100%', height:'100%', objectFit:'cover', display:'block' }}
+          onError={e => { e.target.style.display='none'; }}
+        />
+        {!video.transcript && (
+          <div style={{
+            position:'absolute', top:8, right:8,
+            background:'rgba(0,0,0,0.7)', color:'#aaa',
+            fontSize:10, padding:'2px 6px', borderRadius:4,
+          }}>스크립트 없음</div>
+        )}
+      </div>
+      {/* 텍스트 영역 */}
+      <div style={{ padding:'12px 16px 14px' }}>
+        {mode === 'all' && (
+          <div style={{ display:'flex', alignItems:'center', gap:7, marginBottom:7 }}>
+            <Avatar slug={video.channel_slug} name={video.channel} size={18}/>
+            <span style={{ fontSize:12, color:T.textDim, fontWeight:500 }}>{video.channel}</span>
+          </div>
+        )}
+        <div style={{
+          fontSize:15, fontWeight:600, lineHeight:1.4, marginBottom:6, letterSpacing:'-0.01em',
+          display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden',
+        }}>{video.title}</div>
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:8, marginBottom: video.transcript ? 8 : 0 }}>
           <span style={{ fontSize:11, color:T.textFaint, fontFamily:'JetBrains Mono,monospace' }}>
             {fmtDate(video.published_at)}
           </span>
+          <CopyBtn text={video.transcript}/>
         </div>
-      )}
-      <div style={{
-        fontSize:15.5, fontWeight:600, lineHeight:1.4, marginBottom:8, letterSpacing:'-0.01em',
-      }}>{video.title}</div>
-      <div style={{
-        fontSize:13, color:T.textDim, lineHeight:1.55, marginBottom:12,
-        display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden',
-      }}>{previewText(video.transcript, 140)}</div>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
-        <span style={{ fontSize:11.5, color:T.textFaint, fontFamily:'JetBrains Mono,monospace' }}>
-          {mode === 'channel' ? fmtDate(video.published_at) : ''}
-        </span>
-        <CopyBtn text={video.transcript}/>
+        {video.transcript && (
+          <div style={{
+            fontSize:12.5, color:T.textFaint, lineHeight:1.55,
+            display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden',
+          }}>{previewText(video.transcript, 120)}</div>
+        )}
       </div>
     </div>
   );
@@ -492,11 +509,33 @@ function ScriptDetailScreen({ video, onBack, backLabel }) {
           </a>
         </div>
         <div style={{ padding:'24px 22px 40px' }}>
-          {(video.transcript || '스크립트가 없습니다.').split('\n\n').map((para, i) => (
-            <p key={i} style={{
-              margin:'0 0 18px', fontSize:15.5, lineHeight:1.75, color:'#d6d8dc', letterSpacing:'-0.005em',
-            }}>{para}</p>
-          ))}
+          {!video.transcript
+            ? <p style={{ color:T.textFaint, fontSize:14 }}>스크립트가 없습니다.</p>
+            : (() => {
+                // 타임스탬프 라인들을 10줄씩 묶어 문단으로 표시
+                const lines = video.transcript.split('\n').filter(l => l.trim());
+                const CHUNK = 10;
+                const chunks = [];
+                for (let i = 0; i < lines.length; i += CHUNK) chunks.push(lines.slice(i, i + CHUNK));
+                return chunks.map((chunk, i) => (
+                  <p key={i} style={{
+                    margin:'0 0 20px', fontSize:15.5, lineHeight:1.85, color:'#d6d8dc',
+                    letterSpacing:'-0.005em',
+                  }}>
+                    {chunk.map((line, j) => {
+                      // "0:00 텍스트" 형식에서 타임스탬프 분리
+                      const m = line.match(/^(\d+:\d+)\s+(.*)/);
+                      if (m) return <React.Fragment key={j}>
+                        {j > 0 && ' '}
+                        <span style={{ color:T.textFaint, fontSize:11, fontFamily:'JetBrains Mono,monospace', marginRight:4 }}>{m[1]}</span>
+                        {m[2]}
+                      </React.Fragment>;
+                      return <React.Fragment key={j}>{j > 0 && ' '}{line}</React.Fragment>;
+                    })}
+                  </p>
+                ));
+              })()
+          }
         </div>
       </div>
     </div>
