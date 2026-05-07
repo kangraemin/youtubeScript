@@ -38,7 +38,7 @@ def load_channel(slug_dir: Path) -> list[dict]:
     with open(list_file) as f:
         videos = json.load(f)
 
-    rows = []
+    seen = {}
     for v in videos:
         vid = v.get("vid")
         if not vid:
@@ -46,7 +46,7 @@ def load_channel(slug_dir: Path) -> list[dict]:
         txt_file = slug_dir / f"{vid}.txt"
         transcript = txt_file.read_text(encoding="utf-8").strip() if txt_file.exists() else None
 
-        rows.append({
+        seen[vid] = {
             "vid": vid,
             "channel": v.get("channel", ""),
             "channel_slug": slug_dir.name,
@@ -55,8 +55,8 @@ def load_channel(slug_dir: Path) -> list[dict]:
             "collected_at": v.get("collected_at") or None,
             "transcript": transcript,
             "url": v.get("url", ""),
-        })
-    return rows
+        }
+    return list(seen.values())
 
 
 def upsert_batch(db, rows: list[dict]) -> int:
