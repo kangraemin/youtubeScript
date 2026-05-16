@@ -6,6 +6,9 @@ out/
 build/
 node_modules/
 
+# TypeScript
+*.tsbuildinfo
+
 # misc
 .DS_Store
 *.pem
