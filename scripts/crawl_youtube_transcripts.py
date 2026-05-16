@@ -18,6 +18,10 @@ from pathlib import Path
 from googleapiclient.discovery import build
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeout
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from scripts.channel_config import policy_for, category_of
+
 CHANNELS = [
     {"id": "UCehQiKylaW68H_OtRS36wGQ", "slug": "dulcinea_studio",   "name": "둘시네아",            "tab": "videos"},
     {"id": "UCfpaSruWW3S4dibonKXENjA", "slug": "tzuyang",            "name": "쯔양",               "tab": "videos"},
@@ -323,8 +327,12 @@ def process_channel(ch, headless, output_dir, max_videos, days, skip_existing):
     api_key = os.environ.get("YOUTUBE_API_KEY") or _load_env_key(".env.local", "YOUTUBE_API_KEY")
     youtube = build("youtube", "v3", developerKey=api_key)
 
-    print(f"\n{prefix} ===== {ch['slug']} =====", flush=True)
-    videos = get_channel_videos_api(youtube, ch, max_videos, days)
+    # CLI --days > 0 이면 override, 아니면 카테고리 정책
+    effective_days = days if days > 0 else policy_for(ch["slug"])["days"]
+    cat = category_of(ch["slug"])
+
+    print(f"\n{prefix} ===== {ch['slug']} (category={cat}, days={effective_days}) =====", flush=True)
+    videos = get_channel_videos_api(youtube, ch, max_videos, effective_days)
     print(f"{prefix} 수집 영상: {len(videos)}개", flush=True)
 
     keyword = ch.get("keyword")
