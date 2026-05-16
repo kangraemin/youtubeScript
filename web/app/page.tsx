@@ -43,12 +43,15 @@ export default async function HomePage() {
     fetchChannelStats(),
     supabase
       .from('transcripts')
-      .select('vid,channel,channel_slug,title,published_at,summary,summarized_at')
+      .select('vid,channel,channel_slug,title,published_at,summary,summarized_at', {
+        count: 'exact',
+      })
       .not('summary', 'is', null)
       .order('summarized_at', { ascending: false, nullsFirst: false })
-      .limit(60),
+      .limit(24),
   ])
   const latest = (latestRes.data ?? []) as Transcript[]
+  const totalSummarized = latestRes.count ?? latest.length
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -94,18 +97,35 @@ export default async function HomePage() {
       <section>
         <div className="flex items-baseline justify-between mb-4">
           <h2 className="text-lg font-semibold text-zinc-200">최신 요약</h2>
-          <span className="text-xs text-zinc-500">{latest.length}편</span>
+          <Link
+            href="/latest"
+            className="text-xs text-zinc-400 hover:text-zinc-100"
+          >
+            전체 {totalSummarized}편 →
+          </Link>
         </div>
         {latest.length === 0 ? (
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
             요약된 영상이 아직 없어요.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {latest.map((t) => (
-              <VideoCard key={t.vid} t={t} />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {latest.map((t) => (
+                <VideoCard key={t.vid} t={t} />
+              ))}
+            </div>
+            {totalSummarized > latest.length && (
+              <div className="mt-8 text-center">
+                <Link
+                  href="/latest"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-zinc-100 text-zinc-950 text-sm font-semibold hover:bg-white"
+                >
+                  전체 {totalSummarized}편 보기 →
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </section>
     </main>
