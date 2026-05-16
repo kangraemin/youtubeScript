@@ -20,6 +20,7 @@ from scripts.channel_config import STOCK_ECON_SLUGS
 TARGET_PATH = "/tmp/summarize_target.txt"
 CHUNK_SIZE = 320
 CLAIM_TIMEOUT_MIN = 10
+CUTOFF_DAYS = 30  # 사용자 요청 — 최근 30일치만 백필
 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -83,6 +84,7 @@ def main() -> int:
       WHERE summary IS NULL
         AND transcript IS NOT NULL
         AND channel_slug IN ({slugs_sql})
+        AND published_at >= NOW() - INTERVAL '{CUTOFF_DAYS} days'
         AND (summary_started_at IS NULL
              OR summary_started_at < NOW() - INTERVAL '{CLAIM_TIMEOUT_MIN} minutes')
       ORDER BY published_at DESC
