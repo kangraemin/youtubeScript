@@ -121,15 +121,29 @@ export function SummaryCard({ vid, summary }: Props) {
         </Section>
       )}
 
-      {summary.narrative && (
-        <Section icon="📜" title="영상 흐름" color="slate">
-          <div className="rounded-lg border border-zinc-800 border-l-[3px] border-l-slate-400 bg-zinc-900/50 p-4">
-            <p className="text-sm text-zinc-300 whitespace-pre-line leading-relaxed">
-              {summary.narrative}
-            </p>
-          </div>
-        </Section>
-      )}
+      {summary.narrative && (() => {
+        const steps = summary.narrative
+          .split(/\s*→\s*|\n+/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+        return (
+          <Section icon="📜" title="영상 흐름" color="slate">
+            <ol className="space-y-2">
+              {steps.map((step, i) => (
+                <li
+                  key={i}
+                  className="rounded-lg border border-zinc-800 border-l-[3px] border-l-slate-400 bg-zinc-900/50 p-3 flex gap-3"
+                >
+                  <span className="text-xs font-mono text-slate-500 shrink-0 mt-0.5">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span className="text-sm text-zinc-300 leading-relaxed">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </Section>
+        )
+      })()}
 
       {summary.lessons && summary.lessons.length > 0 && (
         <Section icon="🎓" title="학습 포인트" color="pink">
