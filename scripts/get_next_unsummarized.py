@@ -104,11 +104,17 @@ def main() -> int:
     row = rows[0]
     t = row.pop("transcript") or ""
 
+    # 병렬 sub-agent들이 동시에 호출하면 /tmp/summarize_target.txt가 서로 덮어씀.
+    # vid 기반 고유 경로 사용해 race 방지.
+    target_path = f"/tmp/summarize_target_{row['vid']}.txt"
+    with open(target_path, "w", encoding="utf-8") as f:
+        f.write(t)
+    # 하위 호환: 기존 경로도 갱신 (단일 세션용)
     with open(TARGET_PATH, "w", encoding="utf-8") as f:
         f.write(t)
 
     lines = t.count("\n") + (1 if t and not t.endswith("\n") else 0)
-    row["transcript_path"] = TARGET_PATH
+    row["transcript_path"] = target_path
     row["transcript_chars"] = len(t)
     row["transcript_lines"] = lines
     row["chunk_size"] = CHUNK_SIZE
