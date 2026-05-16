@@ -1,0 +1,14 @@
+.vercel
+
+# Next.js
+.next/
+out/
+build/
+node_modules/
+
+# misc
+.DS_Store
+*.pem
+
+# env
+.env*.local
