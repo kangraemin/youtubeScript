@@ -1,7 +1,7 @@
 import Link from 'next/link'
-import { supabase, Transcript } from '@/lib/supabase'
-import { CHANNEL_META, STOCK_ECON_SLUGS, getChannelMeta } from '@/lib/channels'
-import { VideoCard } from '@/components/VideoCard'
+import { supabase } from '@/lib/supabase'
+import { STOCK_ECON_SLUGS, getChannelMeta } from '@/lib/channels'
+import { InfiniteList } from '@/components/InfiniteList'
 
 export const revalidate = 60
 
@@ -12,7 +12,6 @@ type ChannelStat = {
 }
 
 async function fetchChannelStats(): Promise<ChannelStat[]> {
-  // 7개 채널에 대해 summary 있는 영상 수 + 최신 발행일
   const stats = await Promise.all(
     STOCK_ECON_SLUGS.map(async (slug) => {
       const { count } = await supabase
@@ -39,19 +38,7 @@ async function fetchChannelStats(): Promise<ChannelStat[]> {
 }
 
 export default async function HomePage() {
-  const [channelStats, latestRes] = await Promise.all([
-    fetchChannelStats(),
-    supabase
-      .from('transcripts')
-      .select('vid,channel,channel_slug,title,published_at,summary,summarized_at', {
-        count: 'exact',
-      })
-      .not('summary', 'is', null)
-      .order('summarized_at', { ascending: false, nullsFirst: false })
-      .limit(24),
-  ])
-  const latest = (latestRes.data ?? []) as Transcript[]
-  const totalSummarized = latestRes.count ?? latest.length
+  const channelStats = await fetchChannelStats()
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -95,38 +82,8 @@ export default async function HomePage() {
       </section>
 
       <section>
-        <div className="flex items-baseline justify-between mb-4">
-          <h2 className="text-lg font-semibold text-zinc-200">최신 요약</h2>
-          <Link
-            href="/latest"
-            className="text-xs text-zinc-400 hover:text-zinc-100"
-          >
-            전체 {totalSummarized}편 →
-          </Link>
-        </div>
-        {latest.length === 0 ? (
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
-            요약된 영상이 아직 없어요.
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {latest.map((t) => (
-                <VideoCard key={t.vid} t={t} />
-              ))}
-            </div>
-            {totalSummarized > latest.length && (
-              <div className="mt-8 text-center">
-                <Link
-                  href="/latest"
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-zinc-100 text-zinc-950 text-sm font-semibold hover:bg-white"
-                >
-                  전체 {totalSummarized}편 보기 →
-                </Link>
-              </div>
-            )}
-          </>
-        )}
+        <h2 className="text-lg font-semibold text-zinc-200 mb-4">최신 요약</h2>
+        <InfiniteList mode="latest-summarized" pageSize={20} />
       </section>
     </main>
   )
