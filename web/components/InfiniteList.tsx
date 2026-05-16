@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase, Transcript } from '@/lib/supabase'
 import { VideoCard } from '@/components/VideoCard'
 
-type Mode = 'latest-summarized' | 'channel-all' | 'channel-summarized' | 'channel-pending'
+type Mode = 'latest-summarized' | 'channel-summarized'
 
 type Props = {
   mode: Mode
@@ -40,10 +40,11 @@ export function InfiniteList({ mode, channelSlug, showChannel = true, pageSize =
           .not('summary', 'is', null)
           .order('summarized_at', { ascending: false, nullsFirst: false })
       } else if (channelSlug) {
-        q = q.eq('channel_slug', channelSlug)
-        if (mode === 'channel-summarized') q = q.not('summary', 'is', null)
-        if (mode === 'channel-pending') q = q.is('summary', null)
-        q = q.order('published_at', { ascending: false, nullsFirst: false })
+        // channel-summarized — 요약된 영상만, published_at desc
+        q = q
+          .eq('channel_slug', channelSlug)
+          .not('summary', 'is', null)
+          .order('published_at', { ascending: false, nullsFirst: false })
       }
 
       const { data, error: err } = await q.range(from, to)

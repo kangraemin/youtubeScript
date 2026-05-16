@@ -6,7 +6,6 @@
 
 # 주식·경제 채널 (요약 대상)
 STOCK_ECON_SLUGS = [
-    "moneycomics",
     "moneycomics_videos",
     "shukaworld",
     "yonhap_economy",
