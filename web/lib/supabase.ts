@@ -32,11 +32,58 @@ export type Term = {
   quotes?: Quote[]
 }
 
+export type MacroView = {
+  topic: string
+  view: string
+  speaker: string | null
+  quotes: Quote[]
+}
+
+export type ChartLevel = {
+  ticker: string
+  level: string
+  reason: string
+  speaker: string | null
+  quotes: Quote[]
+}
+
+export type Verdict = {
+  condition: string
+  consequence: string
+  speaker: string | null
+  quotes: Quote[]
+}
+
+export type Lesson = {
+  type: 'rule' | 'counter' | 'reference' | 'analogy'
+  lesson: string
+  speaker: string | null
+  quotes: Quote[]
+}
+
+export type DataPoint = {
+  datum: string
+  quotes: Quote[]
+}
+
+export type ActionItem = {
+  action: string
+  speaker: string | null
+  quotes: Quote[]
+}
+
 export type Summary = {
   buys?: BuySell[]
   sells?: BuySell[]
   watchlist?: WatchItem[]
   terms?: Term[]
+  macro_views?: MacroView[]
+  chart_levels?: ChartLevel[]
+  verdicts?: Verdict[]
+  narrative?: string
+  lessons?: Lesson[]
+  data_points?: DataPoint[]
+  action_items?: ActionItem[]
   headline?: string
   raw_summary?: string
 }
