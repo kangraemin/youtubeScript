@@ -21,6 +21,8 @@ export const CHANNEL_META: Record<string, ChannelMeta> = {
   jisik_inside: { slug: 'jisik_inside', name: '지식인사이드', color: 'violet', hex: '#8b5cf6' },
   developmong: { slug: 'developmong', name: '디벨롭몽', color: 'emerald', hex: '#10b981' },
   doniggangpae: { slug: 'doniggangpae', name: '돈깡패', color: 'orange', hex: '#f97316' },
+  mk_wallstreet: { slug: 'mk_wallstreet', name: '매경 월가월부', color: 'blue', hex: '#3b82f6' },
+  sbs_gyoyangi: { slug: 'sbs_gyoyangi', name: '교양이를 부탁해', color: 'teal', hex: '#14b8a6' },
 }
 
 export const STOCK_ECON_SLUGS = Object.keys(CHANNEL_META)
