@@ -32,7 +32,7 @@ assert _iso_dur_sec('PT0S')==0 and _iso_dur_sec(None)==0
 print('✅ duration 파서 OK')
 " || FAIL=1
 grep -q '_filter_by_min_duration' scripts/crawl_youtube_transcripts.py && echo "✅ 필터 함수 존재" || FAIL=1
-grep -q 'min_dur > 0 and videos' scripts/crawl_youtube_transcripts.py && echo "✅ get_channel_videos_api 연동" || FAIL=1
+grep -q 'return _finalize(videos)' scripts/crawl_youtube_transcripts.py && echo "✅ get_channel_videos_api 연동" || FAIL=1
 
 echo "### TC3: 큐 SUMMARY_SLUGS 사용"
 grep -q 'from scripts.channel_config import SUMMARY_SLUGS' scripts/get_next_unsummarized.py && echo "✅ get_next import" || FAIL=1

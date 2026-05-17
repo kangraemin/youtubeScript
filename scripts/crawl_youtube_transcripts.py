@@ -134,6 +134,12 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
     tab = ch.get("tab", "videos")
     videos = []
 
+    def _finalize(vs: list) -> list:
+        min_dur = policy_for(ch["slug"]).get("min_duration_sec", 0)
+        if min_dur > 0 and vs:
+            return _filter_by_min_duration(youtube, vs, min_dur, ch)
+        return vs
+
     if tab == "streams":
         req = youtube.search().list(
             part="snippet",
@@ -151,10 +157,10 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
                 published_at = item["snippet"]["publishedAt"]
                 pub_dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
                 if cutoff and pub_dt < cutoff:
-                    return videos
+                    return _finalize(videos)
                 videos.append({"url": f"https://www.youtube.com/watch?v={vid}", "vid": vid, "title": title, "meta": published_at[:10], "channel": ch["name"]})
                 if max_videos > 0 and len(videos) >= max_videos:
-                    return videos
+                    return _finalize(videos)
             req = youtube.search().list_next(req, resp)
     else:
         uploads_id = "UU" + channel_id[2:]
@@ -172,16 +178,13 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
                 published_at = snippet["publishedAt"]
                 pub_dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
                 if cutoff and pub_dt < cutoff:
-                    return videos
+                    return _finalize(videos)
                 videos.append({"url": f"https://www.youtube.com/watch?v={vid}", "vid": vid, "title": title, "meta": published_at[:10], "channel": ch["name"]})
                 if max_videos > 0 and len(videos) >= max_videos:
-                    return videos
+                    return _finalize(videos)
             req = youtube.playlistItems().list_next(req, resp)
 
-    min_dur = policy_for(ch["slug"]).get("min_duration_sec", 0)
-    if min_dur > 0 and videos:
-        videos = _filter_by_min_duration(youtube, videos, min_dur, ch)
-    return videos
+    return _finalize(videos)
 
 
 def get_transcript(page, vid: str) -> list[dict] | None:
