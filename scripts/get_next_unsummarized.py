@@ -15,7 +15,7 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.channel_config import STOCK_ECON_SLUGS
+from scripts.channel_config import SUMMARY_SLUGS
 
 TARGET_PATH = "/tmp/summarize_target.txt"
 CHUNK_SIZE = 320
@@ -75,7 +75,7 @@ def run_sql(query: str) -> list:
 
 
 def main() -> int:
-    slugs_sql = ",".join(f"'{s}'" for s in STOCK_ECON_SLUGS)
+    slugs_sql = ",".join(f"'{s}'" for s in SUMMARY_SLUGS)
     query = f"""
     UPDATE public.transcripts
     SET summary_started_at = NOW()

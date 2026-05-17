@@ -81,6 +81,36 @@ def _load_env_key(env_file: str, key: str) -> str:
     raise ValueError(f"{key} not found in env or {env_file}")
 
 
+import re as _re
+
+
+def _iso_dur_sec(iso: str) -> int:
+    """ISO8601 duration(PT#H#M#S) → 초. None/매치실패 시 0."""
+    m = _re.match(r"PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?", iso or "PT0S")
+    if not m:
+        return 0
+    h, mi, s = (int(x) if x else 0 for x in m.groups())
+    return h * 3600 + mi * 60 + s
+
+
+def _filter_by_min_duration(youtube, videos: list, min_sec: int, ch: dict) -> list:
+    """videos.list contentDetails로 duration 조회 → min_sec 미만(쇼츠/단편) 제외."""
+    vids = [v["vid"] for v in videos]
+    keep_ids = set()
+    for i in range(0, len(vids), 50):
+        chunk = vids[i:i + 50]
+        resp = youtube.videos().list(
+            part="contentDetails", id=",".join(chunk)
+        ).execute()
+        for it in resp.get("items", []):
+            if _iso_dur_sec(it["contentDetails"]["duration"]) >= min_sec:
+                keep_ids.add(it["id"])
+    kept = [v for v in videos if v["vid"] in keep_ids]
+    print(f"[{ch['name']}] 쇼츠/단편 필터: {len(videos)} → {len(kept)}개 "
+          f"(min_duration_sec={min_sec})", flush=True)
+    return kept
+
+
 def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) -> list[dict]:
     """YouTube Data API v3으로 채널 영상/스트림 목록 수집."""
     cutoff = None
@@ -146,6 +176,9 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
                     return videos
             req = youtube.playlistItems().list_next(req, resp)
 
+    min_dur = policy_for(ch["slug"]).get("min_duration_sec", 0)
+    if min_dur > 0 and videos:
+        videos = _filter_by_min_duration(youtube, videos, min_dur, ch)
     return videos
 
 

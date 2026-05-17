@@ -16,7 +16,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.channel_config import STOCK_ECON_SLUGS
+from scripts.channel_config import SUMMARY_SLUGS
 
 QUEUE = "/tmp/backfill_queue"
 DAYS = 30
@@ -72,7 +72,7 @@ def main() -> int:
 
     os.makedirs(QUEUE, exist_ok=True)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
-    slugs = ",".join(STOCK_ECON_SLUGS)
+    slugs = ",".join(SUMMARY_SLUGS)
     base = (
         f"{url}/rest/v1/transcripts"
         f"?select=vid,channel_slug,title,published_at,transcript,summary"
