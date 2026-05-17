@@ -22,6 +22,12 @@ STOCK_ECON_SLUGS = [
 # 뉴스 채널 (요약 대상, 단 쇼츠 제외 — 본방만)
 NEWS_SLUGS = ["yonhap_economy"]
 
+# 투자 미디어 채널 (요약 대상, 쇼츠 제외 — 영상+라이브만)
+INVEST_MEDIA_SLUGS = ["mk_wallstreet"]
+
+# 교양 채널 (요약 대상, 쇼츠 제외 — 동영상만)
+CULTURE_SLUGS = ["sbs_gyoyangi"]
+
 # 식당/먹방 채널 (요약 제외)
 FOOD_SLUGS = [
     "dulcinea_studio",
@@ -38,17 +44,19 @@ HEAVY_SLUGS = ["sampro_tv"]
 EXCLUDED_FROM_SUMMARY = set(FOOD_SLUGS) | set(HEAVY_SLUGS)
 
 # 요약 큐 대상 = summary:True 카테고리 슬러그 합집합
-SUMMARY_SLUGS = STOCK_ECON_SLUGS + NEWS_SLUGS
+SUMMARY_SLUGS = STOCK_ECON_SLUGS + NEWS_SLUGS + INVEST_MEDIA_SLUGS + CULTURE_SLUGS
 
 
 # === 카테고리 정책 ===
 # 미래 정책(workers, max_videos 등)도 같은 dict에 추가 가능
 # min_duration_sec > 0 이면 크롤 시 그 길이 미만 영상(쇼츠/단편) 제외
 CATEGORY_POLICY = {
-    "stock_econ": {"days": 30, "summary": True,  "min_duration_sec": 0},
-    "news":       {"days": 30, "summary": True,  "min_duration_sec": 180},
-    "food":       {"days": 60, "summary": False, "min_duration_sec": 0},
-    "heavy":      {"days": 60, "summary": False, "min_duration_sec": 0},  # sampro_tv 등
+    "stock_econ":   {"days": 30, "summary": True,  "min_duration_sec": 0},
+    "news":         {"days": 30, "summary": True,  "min_duration_sec": 180},
+    "invest_media": {"days": 30, "summary": True,  "min_duration_sec": 180},
+    "culture":      {"days": 30, "summary": True,  "min_duration_sec": 180},
+    "food":         {"days": 60, "summary": False, "min_duration_sec": 0},
+    "heavy":        {"days": 60, "summary": False, "min_duration_sec": 0},  # sampro_tv 등
 }
 
 DEFAULT_POLICY = {"days": 30, "summary": False, "min_duration_sec": 0}
@@ -60,6 +68,10 @@ def category_of(slug: str) -> str:
         return "stock_econ"
     if slug in NEWS_SLUGS:
         return "news"
+    if slug in INVEST_MEDIA_SLUGS:
+        return "invest_media"
+    if slug in CULTURE_SLUGS:
+        return "culture"
     if slug in FOOD_SLUGS:
         return "food"
     if slug in HEAVY_SLUGS:
