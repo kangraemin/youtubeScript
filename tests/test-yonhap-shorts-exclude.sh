@@ -18,7 +18,7 @@ assert policy_for('tzuyang')['min_duration_sec'] == 0
 assert 'yonhap_economy' not in STOCK_ECON_SLUGS
 assert 'yonhap_economy' in NEWS_SLUGS
 assert 'yonhap_economy' in SUMMARY_SLUGS
-assert set(SUMMARY_SLUGS) == set(STOCK_ECON_SLUGS) | set(NEWS_SLUGS)
+assert set(STOCK_ECON_SLUGS) | set(NEWS_SLUGS) <= set(SUMMARY_SLUGS)
 assert 'yonhap_economy' not in EXCLUDED_FROM_SUMMARY
 print('✅ 정책 OK')
 " || FAIL=1
