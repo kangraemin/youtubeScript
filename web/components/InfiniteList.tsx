@@ -38,7 +38,7 @@ export function InfiniteList({ mode, channelSlug, showChannel = true, pageSize =
       if (mode === 'latest-summarized') {
         q = q
           .not('summary', 'is', null)
-          .order('summarized_at', { ascending: false, nullsFirst: false })
+          .order('published_at', { ascending: false, nullsFirst: false })
       } else if (channelSlug) {
         // channel-summarized — 요약된 영상만, published_at desc
         q = q
