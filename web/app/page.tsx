@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { STOCK_ECON_SLUGS, getChannelMeta } from '@/lib/channels'
-import { InfiniteList } from '@/components/InfiniteList'
+import { SearchableFeed } from '@/components/SearchableFeed'
 
 export const revalidate = 60
 
@@ -93,7 +93,7 @@ export default async function HomePage() {
 
       <section>
         <h2 className="text-lg font-semibold text-zinc-200 mb-4">최신 요약</h2>
-        <InfiniteList mode="latest-summarized" pageSize={20} />
+        <SearchableFeed />
       </section>
     </main>
   )

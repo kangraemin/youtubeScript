@@ -4,17 +4,25 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase, Transcript } from '@/lib/supabase'
 import { VideoCard } from '@/components/VideoCard'
 
-type Mode = 'latest-summarized' | 'channel-summarized'
+type Mode = 'latest-summarized' | 'channel-summarized' | 'search'
 
 type Props = {
   mode: Mode
   // channel-* 모드에서만 사용
   channelSlug?: string
+  // search 모드에서만 사용
+  searchQuery?: string
   showChannel?: boolean
   pageSize?: number
 }
 
-export function InfiniteList({ mode, channelSlug, showChannel = true, pageSize = 20 }: Props) {
+export function InfiniteList({
+  mode,
+  channelSlug,
+  searchQuery,
+  showChannel = true,
+  pageSize = 20,
+}: Props) {
   const [items, setItems] = useState<Transcript[]>([])
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -31,23 +39,36 @@ export function InfiniteList({ mode, channelSlug, showChannel = true, pageSize =
     try {
       const from = items.length
       const to = from + pageSize - 1
-      let q = supabase
-        .from('transcripts')
-        .select('vid,channel,channel_slug,title,published_at,summary,summarized_at')
+      const cols = 'vid,channel,channel_slug,title,published_at,summary,summarized_at'
 
-      if (mode === 'latest-summarized') {
-        q = q
-          .not('summary', 'is', null)
-          .order('published_at', { ascending: false, nullsFirst: false })
-      } else if (channelSlug) {
-        // channel-summarized — 요약된 영상만, published_at desc
-        q = q
-          .eq('channel_slug', channelSlug)
-          .not('summary', 'is', null)
-          .order('published_at', { ascending: false, nullsFirst: false })
+      let data: Transcript[] | null = null
+      let err: { message: string } | null = null
+
+      if (mode === 'search') {
+        const r = await supabase
+          .rpc('search_transcripts', { q_input: searchQuery ?? '' })
+          .select(cols)
+          .range(from, to)
+        data = r.data as Transcript[] | null
+        err = r.error
+      } else {
+        let qb = supabase.from('transcripts').select(cols)
+        if (mode === 'latest-summarized') {
+          qb = qb
+            .not('summary', 'is', null)
+            .order('published_at', { ascending: false, nullsFirst: false })
+        } else if (channelSlug) {
+          // channel-summarized — 요약된 영상만, published_at desc
+          qb = qb
+            .eq('channel_slug', channelSlug)
+            .not('summary', 'is', null)
+            .order('published_at', { ascending: false, nullsFirst: false })
+        }
+        const r = await qb.range(from, to)
+        data = r.data as Transcript[] | null
+        err = r.error
       }
 
-      const { data, error: err } = await q.range(from, to)
       if (err) {
         setError(err.message)
         return
@@ -59,7 +80,7 @@ export function InfiniteList({ mode, channelSlug, showChannel = true, pageSize =
       setLoading(false)
       inFlight.current = false
     }
-  }, [items.length, done, mode, channelSlug, pageSize])
+  }, [items.length, done, mode, channelSlug, searchQuery, pageSize])
 
   // mount + 모드/필터 변경 시 상태 리셋 후 첫 페이지 fetch.
   useEffect(() => {
@@ -70,7 +91,7 @@ export function InfiniteList({ mode, channelSlug, showChannel = true, pageSize =
     const id = requestAnimationFrame(() => loadMore())
     return () => cancelAnimationFrame(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, channelSlug])
+  }, [mode, channelSlug, searchQuery])
 
   // 무한 스크롤 — sentinel 화면 진입 시 next page
   useEffect(() => {
@@ -96,7 +117,12 @@ export function InfiniteList({ mode, channelSlug, showChannel = true, pageSize =
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {items.map((t) => (
-            <VideoCard key={t.vid} t={t} showChannel={showChannel} />
+            <VideoCard
+              key={t.vid}
+              t={t}
+              showChannel={showChannel}
+              searchQuery={mode === 'search' ? searchQuery : undefined}
+            />
           ))}
         </div>
       )}

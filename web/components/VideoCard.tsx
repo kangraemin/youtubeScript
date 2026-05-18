@@ -2,10 +2,12 @@ import Link from 'next/link'
 import { Transcript } from '@/lib/supabase'
 import { getChannelMeta } from '@/lib/channels'
 import { thumbnailUrl } from '@/lib/youtube'
+import { getMatchReasons } from '@/lib/matchReason'
 
 type Props = {
   t: Transcript
   showChannel?: boolean
+  searchQuery?: string
 }
 
 function CountChip({ label, count, tone }: { label: string; count: number; tone: string }) {
@@ -17,13 +19,14 @@ function CountChip({ label, count, tone }: { label: string; count: number; tone:
   )
 }
 
-export function VideoCard({ t, showChannel = true }: Props) {
+export function VideoCard({ t, showChannel = true, searchQuery }: Props) {
   const ch = getChannelMeta(t.channel_slug, t.channel)
   const s = t.summary
   const buys = s?.buys?.length ?? 0
   const sells = s?.sells?.length ?? 0
   const watch = s?.watchlist?.length ?? 0
   const terms = s?.terms?.length ?? 0
+  const reasons = searchQuery ? getMatchReasons(t, searchQuery) : []
 
   return (
     <Link
@@ -63,6 +66,28 @@ export function VideoCard({ t, showChannel = true }: Props) {
             <CountChip label="매도" count={sells} tone="bg-rose-500/15 text-rose-300" />
             <CountChip label="관전" count={watch} tone="bg-amber-500/15 text-amber-300" />
             <CountChip label="용어" count={terms} tone="bg-violet-500/15 text-violet-300" />
+          </div>
+        )}
+        {reasons.length > 0 && (
+          <div className="mt-1 mb-2 space-y-1">
+            {reasons.map((r, i) => (
+              <div key={i} className="text-[10px] leading-relaxed">
+                <span className="inline-block px-1 py-0.5 rounded bg-zinc-800 text-zinc-400 mr-1 align-middle">
+                  {r.label}
+                </span>
+                <span className="text-zinc-400">
+                  {r.parts.map((p, j) =>
+                    p.hl ? (
+                      <mark key={j} className="bg-amber-400/80 text-zinc-950 rounded px-0.5">
+                        {p.text}
+                      </mark>
+                    ) : (
+                      <span key={j}>{p.text}</span>
+                    )
+                  )}
+                </span>
+              </div>
+            ))}
           </div>
         )}
         <div className="text-[10px] text-zinc-600">{t.published_at}</div>
