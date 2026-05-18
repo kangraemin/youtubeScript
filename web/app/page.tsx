@@ -12,29 +12,39 @@ type ChannelStat = {
 }
 
 async function fetchChannelStats(): Promise<ChannelStat[]> {
-  const stats = await Promise.all(
-    STOCK_ECON_SLUGS.map(async (slug) => {
-      const { count } = await supabase
-        .from('transcripts')
-        .select('vid', { count: 'exact', head: true })
-        .eq('channel_slug', slug)
-        .not('summary', 'is', null)
+  // summary 있는 행의 (channel_slug, published_at) 단일 쿼리로 수집 후 JS 집계.
+  // 채널 수 × 2쿼리(16 round-trip) → 1쿼리(+1000행 초과 시 range 페이지네이션).
+  const rows: { channel_slug: string; published_at: string | null }[] = []
+  const PAGE = 1000
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('transcripts')
+      .select('channel_slug,published_at')
+      .not('summary', 'is', null)
+      .range(from, from + PAGE - 1)
+    if (error || !data || data.length === 0) break
+    rows.push(...data)
+    if (data.length < PAGE) break
+  }
 
-      const { data: latest } = await supabase
-        .from('transcripts')
-        .select('published_at')
-        .eq('channel_slug', slug)
-        .order('published_at', { ascending: false, nullsFirst: false })
-        .limit(1)
+  const agg = new Map<string, { count: number; latest: string | null }>()
+  for (const r of rows) {
+    const a = agg.get(r.channel_slug) ?? { count: 0, latest: null }
+    a.count += 1
+    if (r.published_at && (a.latest === null || r.published_at > a.latest)) {
+      a.latest = r.published_at
+    }
+    agg.set(r.channel_slug, a)
+  }
 
-      return {
-        slug,
-        count_summarized: count ?? 0,
-        latest_published_at: latest?.[0]?.published_at ?? null,
-      }
-    })
-  )
-  return stats
+  return STOCK_ECON_SLUGS.map((slug) => {
+    const a = agg.get(slug)
+    return {
+      slug,
+      count_summarized: a?.count ?? 0,
+      latest_published_at: a?.latest ?? null,
+    }
+  })
 }
 
 export default async function HomePage() {
