@@ -12,7 +12,7 @@
 
 # 주식·경제 채널 (요약 대상, 쇼츠 필터 없음)
 STOCK_ECON_SLUGS = [
-    "moneycomics_videos",
+    "moneycomics",
     "shukaworld",
     "jisik_inside",
     "developmong",

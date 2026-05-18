@@ -11,12 +11,6 @@ export type ChannelMeta = {
 export const CHANNEL_META: Record<string, ChannelMeta> = {
   shukaworld: { slug: 'shukaworld', name: '슈카월드', color: 'amber', hex: '#f59e0b' },
   moneycomics: { slug: 'moneycomics', name: '머니코믹스', color: 'sky', hex: '#0ea5e9' },
-  moneycomics_videos: {
-    slug: 'moneycomics_videos',
-    name: '머니코믹스 클립',
-    color: 'cyan',
-    hex: '#06b6d4',
-  },
   yonhap_economy: { slug: 'yonhap_economy', name: '연합경제TV', color: 'rose', hex: '#f43f5e' },
   jisik_inside: { slug: 'jisik_inside', name: '지식인사이드', color: 'violet', hex: '#8b5cf6' },
   developmong: { slug: 'developmong', name: '디벨롭몽', color: 'emerald', hex: '#10b981' },

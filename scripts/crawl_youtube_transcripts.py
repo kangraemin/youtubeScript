@@ -28,7 +28,7 @@ CHANNELS = [
     {"id": "UCzgpOnor-MzT-1iflZil2GQ", "slug": "jaesunrang",         "name": "재선랑",             "tab": "videos"},
     {"id": "UC-OAmhcFgX9t_OF6fQ-4B1w", "slug": "kimjjamppong",       "name": "김쨈뽕",            "tab": "videos"},
     {"id": "UC-x55HF1-IilhxZOzwJm7JA", "slug": "kimsawon",           "name": "김사원",             "tab": "videos"},
-    {"id": "UCJo6G1u0e_-wS-JQn3T-zEw", "slug": "moneycomics_videos", "name": "머니코믹스",         "tab": "videos"},
+    {"id": "UCJo6G1u0e_-wS-JQn3T-zEw", "slug": "moneycomics",        "name": "머니코믹스",         "tab": "videos"},
     {"id": "UCsJ6RuBiTVWRX156FVbeaGg", "slug": "shukaworld",         "name": "슈카월드",           "tab": "videos", "handle": "syukaworld"},
     {"id": "UChlv4GSd7OQl3js-jkLOnFA", "slug": "sampro_tv",          "name": "삼프로TV",           "tab": "videos"},
     {"id": "UCA_hgsFzmynpv1zkvA5A7jA", "slug": "jisik_inside",       "name": "지식인사이드",       "tab": "videos"},
