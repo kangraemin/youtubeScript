@@ -1,10 +1,21 @@
 import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from supabase import create_client, Client
+
+_ENV_LOCAL = Path(__file__).resolve().parent.parent / ".env.local"
 
 
 def get_client() -> Client:
-    url = os.environ["SUPABASE_URL"]
-    key = os.environ["SUPABASE_SERVICE_KEY"]
+    load_dotenv(_ENV_LOCAL)  # override=False — 기존 env 우선
+    url = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL")
+    key = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        raise RuntimeError(
+            "Supabase 자격 증명 없음: SUPABASE_URL/NEXT_PUBLIC_SUPABASE_URL 및 "
+            "SUPABASE_SERVICE_KEY/SUPABASE_SERVICE_ROLE_KEY 중 하나씩 필요"
+        )
     return create_client(url, key)
 
 
