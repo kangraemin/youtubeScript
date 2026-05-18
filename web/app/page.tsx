@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { STOCK_ECON_SLUGS, getChannelMeta } from '@/lib/channels'
 import { SearchableFeed } from '@/components/SearchableFeed'
 
-export const revalidate = 60
+export const revalidate = 3600
 
 type ChannelStat = {
   slug: string

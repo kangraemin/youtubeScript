@@ -12,19 +12,33 @@ create index if not exists idx_transcripts_summary_trgm
 -- ANALYZE로 통계 갱신해야 trgm 인덱스를 실제로 사용한다.
 analyze public.transcripts;
 
-create or replace function public.search_transcripts(q_input text)
-returns setof public.transcripts
+-- returns table(7컬럼): setof transcripts는 select 무관 전 컬럼 반환(거대 transcript 포함)이라
+-- DB가 wide row를 스캔·정렬. 필요한 7컬럼만 반환해 IO/정렬 비용 절감.
+-- 반환타입 변경은 create or replace 불가 → drop 먼저.
+drop function if exists public.search_transcripts(text);
+
+create function public.search_transcripts(q_input text)
+returns table (
+  vid text,
+  channel text,
+  channel_slug text,
+  title text,
+  published_at date,
+  summary jsonb,
+  summarized_at timestamptz
+)
 language sql
 stable
 as $$
-  select *
-  from public.transcripts
-  where summary is not null
+  select t.vid, t.channel, t.channel_slug, t.title,
+         t.published_at, t.summary, t.summarized_at
+  from public.transcripts t
+  where t.summary is not null
     and (
-      title ilike '%' || q_input || '%'
-      or summary::text ilike '%' || q_input || '%'
+      t.title ilike '%' || q_input || '%'
+      or t.summary::text ilike '%' || q_input || '%'
     )
-  order by published_at desc nulls last
+  order by t.published_at desc nulls last
 $$;
 
 grant execute on function public.search_transcripts(text) to anon, authenticated;

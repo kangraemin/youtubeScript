@@ -34,6 +34,21 @@ def main() -> int:
         "summary_model": model,
     }).eq("vid", vid).execute()
 
+    # 새 요약 반영 — 홈/latest 캐시 무효화 (실패해도 저장은 유지)
+    try:
+        import urllib.parse
+        import urllib.request
+
+        base = os.environ.get("REVALIDATE_URL")
+        sec = os.environ.get("REVALIDATE_SECRET")
+        if base and sec:
+            u = f"{base.rstrip('/')}/api/revalidate?secret={urllib.parse.quote(sec)}"
+            urllib.request.urlopen(
+                urllib.request.Request(u, method="POST"), timeout=8
+            ).read()
+    except Exception as e:
+        print(f"revalidate skip: {e}", file=sys.stderr)
+
     print(f"saved: {vid}")
     return 0
 

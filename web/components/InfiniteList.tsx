@@ -31,6 +31,9 @@ export function InfiniteList({
   // 호출 중복 방지용 (effect race + observer rapid trigger)
   const inFlight = useRef(false)
 
+  // 상세→뒤로 시 재fetch 방지: items+done+scroll을 sessionStorage에 보존.
+  const storageKey = `il:${mode}:${channelSlug ?? ''}:${searchQuery ?? ''}`
+
   const loadMore = useCallback(async () => {
     if (inFlight.current || done) return
     inFlight.current = true
@@ -82,16 +85,62 @@ export function InfiniteList({
     }
   }, [items.length, done, mode, channelSlug, searchQuery, pageSize])
 
-  // mount + 모드/필터 변경 시 상태 리셋 후 첫 페이지 fetch.
+  // mount/키 변경: sessionStorage 캐시 있으면 복원(+스크롤), 없으면 리셋 후 첫 페이지 fetch.
   useEffect(() => {
     inFlight.current = false
-    setItems([])
-    setDone(false)
     setError(null)
-    const id = requestAnimationFrame(() => loadMore())
-    return () => cancelAnimationFrame(id)
+    let restored = false
+    try {
+      const raw = sessionStorage.getItem(storageKey)
+      if (raw) {
+        const c = JSON.parse(raw) as { items: Transcript[]; done: boolean; scrollY: number }
+        if (c.items?.length) {
+          setItems(c.items)
+          setDone(c.done)
+          restored = true
+          requestAnimationFrame(() => window.scrollTo(0, c.scrollY || 0))
+        }
+      }
+    } catch {
+      // 손상된 캐시 무시
+    }
+    if (!restored) {
+      setItems([])
+      setDone(false)
+      const id = requestAnimationFrame(() => loadMore())
+      return () => cancelAnimationFrame(id)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, channelSlug, searchQuery])
+
+  // items/done 변경 + 스크롤(throttle) 시 sessionStorage 기록.
+  useEffect(() => {
+    if (items.length === 0) return
+    const save = () => {
+      try {
+        sessionStorage.setItem(
+          storageKey,
+          JSON.stringify({ items, done, scrollY: window.scrollY })
+        )
+      } catch {
+        // 용량 초과 등 무시
+      }
+    }
+    save()
+    let t: ReturnType<typeof setTimeout> | null = null
+    const onScroll = () => {
+      if (t) return
+      t = setTimeout(() => {
+        t = null
+        save()
+      }, 250)
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      if (t) clearTimeout(t)
+    }
+  }, [items, done, storageKey])
 
   // 무한 스크롤 — sentinel 화면 진입 시 next page
   useEffect(() => {

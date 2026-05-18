@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { InfiniteList } from '@/components/InfiniteList'
 
-export const revalidate = 60
+export const revalidate = 3600
 
 export default function LatestPage() {
   return (
