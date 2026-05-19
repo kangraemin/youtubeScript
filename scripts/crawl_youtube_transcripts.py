@@ -187,6 +187,37 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
     return _finalize(videos)
 
 
+def _ts_to_seconds(ts: str) -> int | None:
+    """'M:SS' 또는 'H:MM:SS' → 초. 파싱 불가 시 None."""
+    parts = (ts or "").strip().split(":")
+    try:
+        nums = [int(p) for p in parts]
+    except ValueError:
+        return None
+    if len(nums) == 2:
+        return nums[0] * 60 + nums[1]
+    if len(nums) == 3:
+        return nums[0] * 3600 + nums[1] * 60 + nums[2]
+    return None
+
+
+def dedup_segments(segments: list[dict]) -> list[dict]:
+    """패널 N배 마운트로 [전체S][전체S...] 형태로 수집된 세그먼트에서
+    타임스탬프가 되돌아가는 첫 지점(= 중복 사이클 시작) 이전까지만 keep.
+    정상 transcript는 타임스탬프 단조 비감소이므로 무변경."""
+    if not segments:
+        return segments
+    prev = -1
+    for i, seg in enumerate(segments):
+        sec = _ts_to_seconds(seg.get("timestamp", ""))
+        if sec is None:
+            continue
+        if sec < prev:                 # 타임스탬프 역행 = 중복 사이클 진입
+            return segments[:i]
+        prev = sec
+    return segments
+
+
 def get_transcript(page, vid: str) -> list[dict] | None:
     """Open video, click transcript button, extract segments.
 
@@ -337,7 +368,7 @@ def get_transcript(page, vid: str) -> list[dict] | None:
                     result.append({"timestamp": ts, "text": text})
             except Exception:
                 continue
-    return result or None
+    return dedup_segments(result) or None
 
 
 def save_transcript(out_dir: str, slug: str, vid: str, title: str, url: str, segments: list[dict]):
