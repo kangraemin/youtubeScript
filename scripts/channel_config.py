@@ -23,7 +23,7 @@ STOCK_ECON_SLUGS = [
 NEWS_SLUGS = ["yonhap_economy"]
 
 # 투자 미디어 채널 (요약 대상, 쇼츠 제외 — 영상+라이브만)
-INVEST_MEDIA_SLUGS = ["mk_wallstreet"]
+INVEST_MEDIA_SLUGS = ["mk_wallstreet", "aspim_research"]
 
 # 교양 채널 (요약 대상, 쇼츠 제외 — 동영상만)
 CULTURE_SLUGS = ["sbs_gyoyangi"]

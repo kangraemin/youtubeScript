@@ -37,6 +37,7 @@ CHANNELS = [
     {"id": "",                           "slug": "doniggangpae",       "name": "돈이깡패다",          "tab": "videos", "handle": "돈이깡패다"},
     {"id": "UCIipmgxpUxDmPP-ma3Ahvbw", "slug": "mk_wallstreet",      "name": "매경 월가월부",      "tab": "videos"},
     {"id": "UChY8VUjXv0aA7RF9hDQ0ISg", "slug": "sbs_gyoyangi",       "name": "교양이를 부탁해",    "tab": "videos"},
+    {"id": "",                           "slug": "aspim_research",     "name": "애스핌 리서치",      "tab": "videos", "handle": "ASPIM_research"},
 ]
 
 
