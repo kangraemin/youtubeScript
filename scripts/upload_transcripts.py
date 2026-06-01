@@ -44,7 +44,7 @@ def load_channel(slug_dir: Path) -> list[dict]:
         if not vid:
             continue
         txt_file = slug_dir / f"{vid}.txt"
-        transcript = txt_file.read_text(encoding="utf-8").strip() if txt_file.exists() else None
+        has_tx = txt_file.exists() and txt_file.stat().st_size > 0
 
         seen[vid] = {
             "vid": vid,
@@ -53,7 +53,9 @@ def load_channel(slug_dir: Path) -> list[dict]:
             "title": v.get("title", ""),
             "published_at": _parse_date(v.get("meta")),
             "collected_at": v.get("collected_at") or None,
-            "transcript": transcript,
+            # transcript 본문은 DB에 올리지 않는다 — 로컬 rawdata가 단일 소스.
+            # 존재 여부만 기록(요약 큐 판정용). 본문은 get_next가 로컬에서 읽음.
+            "has_transcript": has_tx,
             "url": v.get("url", ""),
         }
     return list(seen.values())
@@ -68,6 +70,7 @@ def main():
     db = get_client()
     total = 0
 
+    failed = []
     for slug_dir in sorted(TRANSCRIPTS_DIR.iterdir()):
         if not slug_dir.is_dir():
             continue
@@ -76,13 +79,20 @@ def main():
             print(f"  {slug_dir.name}: 0개 (skip)")
             continue
 
-        inserted = 0
-        for i in range(0, len(rows), BATCH_SIZE):
-            inserted += upsert_batch(db, rows[i:i + BATCH_SIZE])
-        print(f"  {slug_dir.name}: {inserted}개 upsert")
-        total += inserted
+        # 채널별 격리 — 한 채널 업로드 실패가 뒤 채널을 막지 않게.
+        try:
+            inserted = 0
+            for i in range(0, len(rows), BATCH_SIZE):
+                inserted += upsert_batch(db, rows[i:i + BATCH_SIZE])
+            print(f"  {slug_dir.name}: {inserted}개 upsert")
+            total += inserted
+        except Exception as e:
+            print(f"  ⚠ {slug_dir.name}: 업로드 실패 — {e}")
+            failed.append(slug_dir.name)
 
     print(f"\n완료: 총 {total}개")
+    if failed:
+        print(f"⚠ 실패 채널: {failed}")
 
 
 if __name__ == "__main__":

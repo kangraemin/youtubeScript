@@ -74,15 +74,19 @@ def run_sql(query: str) -> list:
         return json.loads(resp.read().decode("utf-8"))
 
 
+RAWDATA_DIR = os.path.join(PROJECT_ROOT, "rawdata", "transcripts")
+
+
 def main() -> int:
     slugs_sql = ",".join(f"'{s}'" for s in SUMMARY_SLUGS)
+    # transcript 본문은 DB에 없다(로컬 rawdata가 단일 소스). has_transcript로 큐 판정.
     query = f"""
     UPDATE public.transcripts
     SET summary_started_at = NOW()
     WHERE vid = (
       SELECT vid FROM public.transcripts
       WHERE summary IS NULL
-        AND transcript IS NOT NULL
+        AND has_transcript = true
         AND channel_slug IN ({slugs_sql})
         AND published_at >= NOW() - INTERVAL '{CUTOFF_DAYS} days'
         AND (summary_started_at IS NULL
@@ -91,20 +95,33 @@ def main() -> int:
       LIMIT 1
       FOR UPDATE SKIP LOCKED
     )
-    RETURNING vid, channel, channel_slug, title, published_at, transcript, url;
+    RETURNING vid, channel, channel_slug, title, published_at, url;
     """
-    rows = run_sql(query)
 
-    if not rows:
-        try:
-            os.remove(TARGET_PATH)
-        except FileNotFoundError:
-            pass
-        print(json.dumps({"empty": True}))
-        return 0
+    # claim → 로컬 transcript 파일 읽기. 로컬 파일이 없으면 park(재claim 방지) 후 다음 후보.
+    while True:
+        rows = run_sql(query)
+        if not rows:
+            try:
+                os.remove(TARGET_PATH)
+            except FileNotFoundError:
+                pass
+            print(json.dumps({"empty": True}))
+            return 0
 
-    row = rows[0]
-    t = row.pop("transcript") or ""
+        row = rows[0]
+        src = os.path.join(RAWDATA_DIR, row["channel_slug"], row["vid"] + ".txt")
+        if os.path.isfile(src) and os.path.getsize(src) > 0:
+            with open(src, encoding="utf-8") as f:
+                t = f.read()
+            break
+
+        # 로컬 본문 없음 → far-future로 park(다시 claim되지 않게) 후 다음 후보로.
+        run_sql(
+            "UPDATE public.transcripts SET summary_started_at = '2099-01-01' "
+            f"WHERE vid = '{row['vid']}'"
+        )
+        print(f"  [skip] {row['vid']}: 로컬 transcript 없음 → park", file=sys.stderr)
 
     # 병렬 sub-agent들이 동시에 호출하면 /tmp/summarize_target.txt가 서로 덮어씀.
     # vid 기반 고유 경로 사용해 race 방지.

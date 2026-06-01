@@ -14,7 +14,7 @@ export default async function VideoPage({
   const { vid } = await params
   const { data } = await supabase
     .from('transcripts')
-    .select('*')
+    .select('vid,channel,channel_slug,title,published_at,url,summary,summarized_at')
     .eq('vid', vid)
     .single()
 
@@ -83,17 +83,6 @@ export default async function VideoPage({
       <div className="mt-8">
         <SummaryCard vid={t.vid} summary={t.summary} />
       </div>
-
-      {t.transcript && (
-        <details className="mt-10 rounded-lg border border-zinc-800 bg-zinc-900/40 p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-zinc-400 hover:text-zinc-200">
-            📄 원본 스크립트 보기
-          </summary>
-          <pre className="mt-3 p-3 bg-zinc-950/50 rounded text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap font-mono">
-            {t.transcript}
-          </pre>
-        </details>
-      )}
     </main>
   )
 }
