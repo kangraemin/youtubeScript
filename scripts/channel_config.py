@@ -46,6 +46,10 @@ EXCLUDED_FROM_SUMMARY = set(FOOD_SLUGS) | set(HEAVY_SLUGS)
 # 요약 큐 대상 = summary:True 카테고리 슬러그 합집합
 SUMMARY_SLUGS = STOCK_ECON_SLUGS + NEWS_SLUGS + INVEST_MEDIA_SLUGS + CULTURE_SLUGS
 
+# 요약 전 LLM 관련성 스크리닝을 적용할 채널 (비경제 콘텐츠가 섞인 채널만).
+# 워커가 제목+앞부분으로 주식·경제 요약 가치를 판정해, 가치 없으면 screened_out 처리한다.
+SCREEN_SLUGS = {"jisik_inside", "yonhap_economy"}
+
 
 # === 카테고리 정책 ===
 # 미래 정책(workers, max_videos 등)도 같은 dict에 추가 가능

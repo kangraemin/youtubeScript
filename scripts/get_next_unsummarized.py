@@ -87,6 +87,7 @@ def main() -> int:
       SELECT vid FROM public.transcripts
       WHERE summary IS NULL
         AND has_transcript = true
+        AND screened_out = false
         AND channel_slug IN ({slugs_sql})
         AND published_at >= NOW() - INTERVAL '{CUTOFF_DAYS} days'
         AND (summary_started_at IS NULL
