@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""DB에서 transcript=NULL인 영상들을 Playwright로 수집 후 바로 Supabase 업데이트.
+"""DB에서 has_transcript=false인 영상들을 Playwright로 수집해 rawdata 저장 + has_transcript=true 세팅.
+
+transcript 본문은 로컬 rawdata가 단일 소스 — DB엔 본문을 쓰지 않는다(메타만).
 
 Usage:
     python scripts/backfill_from_db.py
@@ -47,7 +49,7 @@ def main():
     rows = []
     page = 0
     while True:
-        q = db.table("transcripts").select("vid, channel, channel_slug, title, url, published_at").is_("transcript", "null")
+        q = db.table("transcripts").select("vid, channel, channel_slug, title, url, published_at").eq("has_transcript", False)
         if args.channel != "all":
             q = q.eq("channel_slug", args.channel)
         r = q.range(page * 1000, (page + 1) * 1000 - 1).execute()
@@ -60,7 +62,7 @@ def main():
         print("NULL 없음")
         return
 
-    print(f"총 {len(rows)}개 NULL 처리 시작")
+    print(f"총 {len(rows)}개 has_transcript=false 처리 시작")
     from collections import Counter
     for ch, n in Counter(r["channel_slug"] for r in rows).most_common():
         print(f"  {ch}: {n}")
@@ -87,36 +89,32 @@ def main():
 
             segments = get_transcript(page_obj, vid)
             if segments:
-                # txt 파일 저장
+                # txt 파일을 rawdata에 저장 (transcript 본문 단일 소스)
                 save_transcript(str(TRANSCRIPTS_DIR), slug, vid,
                                 row.get("title", ""), row.get("url", ""), segments)
-                # 텍스트 조합 (title\nurl\n...\n\ntimestamp text)
                 txt_file = TRANSCRIPTS_DIR / slug / f"{vid}.txt"
-                transcript_text = txt_file.read_text(encoding="utf-8").strip() if txt_file.exists() else None
-                if transcript_text:
-                    BATCH.append({"vid": vid, "transcript": transcript_text})
+                if txt_file.exists() and txt_file.stat().st_size > 0:
+                    BATCH.append(vid)   # DB엔 본문 안 씀 — has_transcript=true 세팅 대상 vid만
                 ok += 1
             else:
                 fail += 1
 
-            # 50개마다 DB 업데이트
+            # 50개마다 has_transcript 일괄 세팅 (메타만, 본문 미기록)
             if len(BATCH) >= 50:
-                for item in BATCH:
-                    try:
-                        db.table("transcripts").update({"transcript": item["transcript"]}).eq("vid", item["vid"]).execute()
-                    except Exception as e:
-                        print(f"  update 에러 ({item['vid']}): {e}")
-                print(f"  [{i}/{len(rows)}] ok={ok} fail={fail} — DB {len(BATCH)}개 업데이트", flush=True)
+                try:
+                    db.table("transcripts").update({"has_transcript": True}).in_("vid", BATCH).execute()
+                except Exception as e:
+                    print(f"  update 에러: {e}")
+                print(f"  [{i}/{len(rows)}] ok={ok} fail={fail} — has_transcript {len(BATCH)}개 세팅", flush=True)
                 BATCH.clear()
 
-        # 나머지 업로드
+        # 나머지 세팅
         if BATCH:
-            for item in BATCH:
-                try:
-                    db.table("transcripts").update({"transcript": item["transcript"]}).eq("vid", item["vid"]).execute()
-                except Exception as e:
-                    print(f"  update 에러 ({item['vid']}): {e}")
-            print(f"  최종 DB {len(BATCH)}개 업데이트", flush=True)
+            try:
+                db.table("transcripts").update({"has_transcript": True}).in_("vid", BATCH).execute()
+            except Exception as e:
+                print(f"  update 에러: {e}")
+            print(f"  최종 has_transcript {len(BATCH)}개 세팅", flush=True)
 
         context.close()
         browser.close()
