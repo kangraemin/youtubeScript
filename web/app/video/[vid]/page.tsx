@@ -81,7 +81,7 @@ export default async function VideoPage({
       </article>
 
       <div className="mt-8">
-        <SummaryCard vid={t.vid} summary={t.summary} />
+        <SummaryCard vid={t.vid} summary={t.summary ?? null} />
       </div>
     </main>
   )

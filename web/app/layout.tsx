@@ -1,5 +1,6 @@
 import './globals.css'
 import type { Metadata } from 'next'
+import { RouteProgress } from '@/components/RouteProgress'
 
 export const metadata: Metadata = {
   title: 'YouTube 주식·경제 요약',
@@ -13,7 +14,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ko">
-      <body className="bg-bg text-zinc-100 min-h-screen">{children}</body>
+      <body className="bg-bg text-zinc-100 min-h-screen">
+        <RouteProgress />
+        {children}
+      </body>
     </html>
   )
 }

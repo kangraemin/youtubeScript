@@ -94,8 +94,14 @@ export type Transcript = {
   channel_slug: string
   title: string
   published_at: string | null
-  transcript: string | null
-  url: string
-  summary: Summary | null
+  transcript?: string | null
+  url?: string
+  summary?: Summary | null
   summarized_at: string | null
+  // 브라우즈 피드 경량 RPC(feed_summaries) 전용 필드 — summary 전체 대신 headline+개수만.
+  headline?: string | null
+  n_buys?: number
+  n_sells?: number
+  n_watch?: number
+  n_terms?: number
 }

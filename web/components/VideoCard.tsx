@@ -22,10 +22,13 @@ function CountChip({ label, count, tone }: { label: string; count: number; tone:
 export function VideoCard({ t, showChannel = true, searchQuery }: Props) {
   const ch = getChannelMeta(t.channel_slug, t.channel)
   const s = t.summary
-  const buys = s?.buys?.length ?? 0
-  const sells = s?.sells?.length ?? 0
-  const watch = s?.watchlist?.length ?? 0
-  const terms = s?.terms?.length ?? 0
+  // 카운트·헤드라인을 full summary(검색) 또는 경량 RPC 필드(브라우즈) 양쪽에서 읽음.
+  const headline = s?.headline ?? t.headline ?? null
+  const buys = s?.buys?.length ?? t.n_buys ?? 0
+  const sells = s?.sells?.length ?? t.n_sells ?? 0
+  const watch = s?.watchlist?.length ?? t.n_watch ?? 0
+  const terms = s?.terms?.length ?? t.n_terms ?? 0
+  const hasMeta = !!s || headline != null || t.n_buys != null
   const reasons = searchQuery ? getMatchReasons(t, searchQuery) : []
 
   return (
@@ -55,12 +58,12 @@ export function VideoCard({ t, showChannel = true, searchQuery }: Props) {
         <h3 className="text-sm font-semibold leading-snug line-clamp-2 mb-1.5 text-zinc-100">
           {t.title}
         </h3>
-        {s?.headline ? (
-          <p className="text-xs text-zinc-400 line-clamp-2 mb-2 leading-relaxed">{s.headline}</p>
+        {headline ? (
+          <p className="text-xs text-zinc-400 line-clamp-2 mb-2 leading-relaxed">{headline}</p>
         ) : (
           <p className="text-xs text-zinc-600 mb-2">(요약 대기 중)</p>
         )}
-        {s && (
+        {hasMeta && (
           <div className="flex flex-wrap gap-1 mb-2">
             <CountChip label="매수" count={buys} tone="bg-emerald-500/15 text-emerald-300" />
             <CountChip label="매도" count={sells} tone="bg-rose-500/15 text-rose-300" />

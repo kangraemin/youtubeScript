@@ -55,19 +55,13 @@ export function InfiniteList({
         data = r.data as Transcript[] | null
         err = r.error
       } else {
-        let qb = supabase.from('transcripts').select(cols)
-        if (mode === 'latest-summarized') {
-          qb = qb
-            .not('summary', 'is', null)
-            .order('published_at', { ascending: false, nullsFirst: false })
-        } else if (channelSlug) {
-          // channel-summarized — 요약된 영상만, published_at desc
-          qb = qb
-            .eq('channel_slug', channelSlug)
-            .not('summary', 'is', null)
-            .order('published_at', { ascending: false, nullsFirst: false })
-        }
-        const r = await qb.range(from, to)
+        // 브라우즈 피드(latest/channel)는 경량 RPC — headline + 매수/매도/관전/용어 개수만.
+        // summary(13섹션 전체 jsonb)를 끌어오지 않아 페이로드가 작다.
+        const r = await supabase.rpc('feed_summaries', {
+          p_channel: mode === 'channel-summarized' ? channelSlug ?? null : null,
+          p_limit: pageSize,
+          p_offset: from,
+        })
         data = r.data as Transcript[] | null
         err = r.error
       }

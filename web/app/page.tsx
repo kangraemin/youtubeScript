@@ -22,7 +22,9 @@ async function fetchChannelStats(): Promise<ChannelStat[]> {
       .select('channel_slug,published_at')
       .not('summary', 'is', null)
       .range(from, from + PAGE - 1)
-    if (error || !data || data.length === 0) break
+    // 에러를 삼키면 0 결과가 ISR에 캐시됨(DB 일시 장애 때 홈 카운트 0 고착) → throw로 렌더 실패시켜 이전 캐시 유지
+    if (error) throw error
+    if (!data || data.length === 0) break
     rows.push(...data)
     if (data.length < PAGE) break
   }
