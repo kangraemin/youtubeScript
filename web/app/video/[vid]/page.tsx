@@ -4,7 +4,7 @@ import { SummaryCard } from '@/components/SummaryCard'
 import { getChannelMeta } from '@/lib/channels'
 import { thumbnailUrl, watchUrl } from '@/lib/youtube'
 
-export const revalidate = 60
+export const revalidate = 3600 // 상세 콘텐츠는 요약 후 거의 불변 — 반복 방문 캐시 적중(60s마다 재생성 방지)
 
 export default async function VideoPage({
   params,
