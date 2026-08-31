@@ -98,6 +98,8 @@ export type Transcript = {
   url?: string
   summary?: Summary | null
   summarized_at: string | null
+  // 영상 길이(초). 쇼츠 필터에 쓴다. -1은 삭제·비공개로 조회 불가, null은 아직 백필 전.
+  duration_sec?: number | null
   // 브라우즈 피드 경량 RPC(feed_summaries) 전용 필드 — summary 전체 대신 headline+개수만.
   headline?: string | null
   n_buys?: number

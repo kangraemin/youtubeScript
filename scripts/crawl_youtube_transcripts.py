@@ -101,19 +101,30 @@ def _iso_dur_sec(iso: str) -> int:
     return h * 3600 + mi * 60 + s
 
 
-def _filter_by_min_duration(youtube, videos: list, min_sec: int, ch: dict) -> list:
-    """videos.list contentDetails로 duration 조회 → min_sec 미만(쇼츠/단편) 제외."""
+def _attach_duration(youtube, videos: list, min_sec: int, ch: dict) -> list:
+    """videos.list로 duration을 조회해 각 항목에 duration_sec을 붙이고,
+    min_sec > 0이면 그 미만(쇼츠/단편)을 제외한다.
+
+    duration은 필터가 꺼진 채널에서도 조회한다 — 웹 쇼츠 필터가 길이를 쓰기 때문.
+    videos 항목은 save_list_json이 그대로 _list.json에 쓰므로 upload까지 자동 전파된다.
+    videos.list는 50개당 1 unit이라 quota 부담이 거의 없다.
+    """
     vids = [v["vid"] for v in videos]
-    keep_ids = set()
+    dur: dict[str, int] = {}
     for i in range(0, len(vids), 50):
-        chunk = vids[i:i + 50]
         resp = youtube.videos().list(
-            part="contentDetails", id=",".join(chunk)
+            part="contentDetails", id=",".join(vids[i:i + 50])
         ).execute()
         for it in resp.get("items", []):
-            if _iso_dur_sec(it["contentDetails"]["duration"]) >= min_sec:
-                keep_ids.add(it["id"])
-    kept = [v for v in videos if v["vid"] in keep_ids]
+            dur[it["id"]] = _iso_dur_sec(it["contentDetails"]["duration"])
+
+    for v in videos:
+        v["duration_sec"] = dur.get(v["vid"], -1)  # -1 = 조회 불가(삭제·비공개)
+
+    if min_sec <= 0:
+        return videos
+
+    kept = [v for v in videos if v["duration_sec"] >= min_sec]
     print(f"[{ch['name']}] 쇼츠/단편 필터: {len(videos)} → {len(kept)}개 "
           f"(min_duration_sec={min_sec})", flush=True)
     return kept
@@ -141,10 +152,10 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
     videos = []
 
     def _finalize(vs: list) -> list:
+        if not vs:
+            return vs
         min_dur = policy_for(ch["slug"]).get("min_duration_sec", 0)
-        if min_dur > 0 and vs:
-            return _filter_by_min_duration(youtube, vs, min_dur, ch)
-        return vs
+        return _attach_duration(youtube, vs, min_dur, ch)
 
     if tab == "streams":
         req = youtube.search().list(

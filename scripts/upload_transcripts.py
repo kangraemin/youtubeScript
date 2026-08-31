@@ -46,6 +46,10 @@ def load_channel(slug_dir: Path) -> list[dict]:
         txt_file = slug_dir / f"{vid}.txt"
         has_tx = txt_file.exists() and txt_file.stat().st_size > 0
 
+        # duration_sec은 여기서 올리지 않는다.
+        # bulk upsert는 배치 내 row들이 같은 키를 가져야 안전한데, 구버전 _list.json에는
+        # duration_sec이 없어 키가 섞이면 기존 값이 NULL로 덮일 수 있다.
+        # 길이는 backfill_duration.py가 NULL인 행만 채우는 단일 책임으로 관리한다.
         seen[vid] = {
             "vid": vid,
             "channel": v.get("channel", ""),

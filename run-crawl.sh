@@ -26,3 +26,5 @@ fi
 source .env.local
 .venv/bin/python scripts/crawl_youtube_transcripts.py --headless --workers 3 >> rawdata/transcripts/_cron.log 2>&1
 .venv/bin/python scripts/upload_transcripts.py >> rawdata/transcripts/_cron.log 2>&1
+# 신규 적재분의 duration_sec 채우기 (웹 쇼츠 필터용). NULL인 행만 조회하므로 증분만 처리된다.
+.venv/bin/python scripts/backfill_duration.py >> rawdata/transcripts/_cron.log 2>&1

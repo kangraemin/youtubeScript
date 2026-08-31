@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase, Transcript } from '@/lib/supabase'
 import { VideoCard } from '@/components/VideoCard'
+import { ShortsFilter, SHORTS_THRESHOLD_SEC, readHideShorts } from '@/components/ShortsFilter'
 
 type Mode = 'latest-summarized' | 'channel-summarized' | 'search'
 
@@ -27,12 +28,23 @@ export function InfiniteList({
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 쇼츠 숨기기. 저장값은 마운트 후 읽어 hydration 불일치를 피한다.
+  const [hideShorts, setHideShorts] = useState(false)
   const sentinelRef = useRef<HTMLDivElement>(null)
   // 호출 중복 방지용 (effect race + observer rapid trigger)
   const inFlight = useRef(false)
+  // 서버에서 받아온 원본 행 수. 검색 모드는 클라이언트에서 쇼츠를 걸러내므로
+  // items.length를 offset으로 쓰면 걸러낸 만큼 범위가 겹쳐 중복이 생긴다.
+  const fetchedCount = useRef(0)
+
+  useEffect(() => {
+    const saved = readHideShorts()
+    if (saved) setHideShorts(true)
+  }, [])
 
   // 상세→뒤로 시 재fetch 방지: items+done+scroll을 sessionStorage에 보존.
-  const storageKey = `il:${mode}:${channelSlug ?? ''}:${searchQuery ?? ''}`
+  // 쇼츠 필터가 키에 들어가야 필터별 목록이 서로 섞이지 않는다.
+  const storageKey = `il:${mode}:${channelSlug ?? ''}:${searchQuery ?? ''}:${hideShorts ? 'nosh' : 'all'}`
 
   const loadMore = useCallback(async () => {
     if (inFlight.current || done) return
@@ -40,7 +52,7 @@ export function InfiniteList({
     setLoading(true)
     setError(null)
     try {
-      const from = items.length
+      const from = fetchedCount.current
       const to = from + pageSize - 1
       const cols = 'vid,channel,channel_slug,title,published_at,summary,summarized_at'
 
@@ -48,6 +60,7 @@ export function InfiniteList({
       let err: { message: string } | null = null
 
       if (mode === 'search') {
+        // 검색 RPC는 길이 조건을 받지 않으므로 결과를 클라이언트에서 걸러낸다.
         const r = await supabase
           .rpc('search_transcripts', { q_input: searchQuery ?? '' })
           .select(cols)
@@ -61,6 +74,7 @@ export function InfiniteList({
           p_channel: mode === 'channel-summarized' ? channelSlug ?? null : null,
           p_limit: pageSize,
           p_offset: from,
+          p_min_duration: hideShorts ? SHORTS_THRESHOLD_SEC : 0,
         })
         data = r.data as Transcript[] | null
         err = r.error
@@ -70,14 +84,21 @@ export function InfiniteList({
         setError(err.message)
         return
       }
-      const next = (data ?? []) as Transcript[]
+      const raw = (data ?? []) as Transcript[]
+      fetchedCount.current += raw.length
+      // 검색 RPC는 길이 조건을 못 받으므로 여기서 거른다. 길이를 모르는 행(null/-1)도 함께 제외.
+      const next =
+        mode === 'search' && hideShorts
+          ? raw.filter((t) => (t.duration_sec ?? -1) >= SHORTS_THRESHOLD_SEC)
+          : raw
       setItems((prev) => [...prev, ...next])
-      if (next.length < pageSize) setDone(true)
+      // 끝 판정은 걸러낸 뒤가 아니라 서버가 준 원본 개수로 해야 조기 종료되지 않는다.
+      if (raw.length < pageSize) setDone(true)
     } finally {
       setLoading(false)
       inFlight.current = false
     }
-  }, [items.length, done, mode, channelSlug, searchQuery, pageSize])
+  }, [done, mode, channelSlug, searchQuery, pageSize, hideShorts])
 
   // mount/키 변경: sessionStorage 캐시 있으면 복원(+스크롤), 없으면 리셋 후 첫 페이지 fetch.
   useEffect(() => {
@@ -87,10 +108,17 @@ export function InfiniteList({
     try {
       const raw = sessionStorage.getItem(storageKey)
       if (raw) {
-        const c = JSON.parse(raw) as { items: Transcript[]; done: boolean; scrollY: number }
+        const c = JSON.parse(raw) as {
+          items: Transcript[]
+          done: boolean
+          scrollY: number
+          fetched?: number
+        }
         if (c.items?.length) {
           setItems(c.items)
           setDone(c.done)
+          // 복원 시 offset도 함께 되돌린다. 없으면(구버전 캐시) items 수로 근사.
+          fetchedCount.current = c.fetched ?? c.items.length
           restored = true
           requestAnimationFrame(() => window.scrollTo(0, c.scrollY || 0))
         }
@@ -101,11 +129,12 @@ export function InfiniteList({
     if (!restored) {
       setItems([])
       setDone(false)
+      fetchedCount.current = 0
       const id = requestAnimationFrame(() => loadMore())
       return () => cancelAnimationFrame(id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, channelSlug, searchQuery])
+  }, [mode, channelSlug, searchQuery, hideShorts])
 
   // items/done 변경 + 스크롤(throttle) 시 sessionStorage 기록.
   useEffect(() => {
@@ -114,7 +143,7 @@ export function InfiniteList({
       try {
         sessionStorage.setItem(
           storageKey,
-          JSON.stringify({ items, done, scrollY: window.scrollY })
+          JSON.stringify({ items, done, scrollY: window.scrollY, fetched: fetchedCount.current })
         )
       } catch {
         // 용량 초과 등 무시
@@ -153,9 +182,13 @@ export function InfiniteList({
 
   return (
     <>
+      <div className="mb-4 flex items-center justify-end">
+        <ShortsFilter value={hideShorts} onChange={setHideShorts} />
+      </div>
+
       {items.length === 0 && !loading ? (
         <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
-          표시할 영상이 없어요.
+          {hideShorts ? '3분 이상 영상이 없어요. 필터를 꺼보세요.' : '표시할 영상이 없어요.'}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
