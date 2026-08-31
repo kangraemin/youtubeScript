@@ -20,7 +20,9 @@ from scripts.channel_config import SUMMARY_SLUGS
 TARGET_PATH = "/tmp/summarize_target.txt"
 CHUNK_SIZE = 320
 CLAIM_TIMEOUT_MIN = 10
-CUTOFF_DAYS = 30  # 사용자 요청 — 최근 30일치만 백필
+# 기본 30일(기존 cron 동작 유지). 밀린 물량을 소급 요약할 땐 SUMMARY_CUTOFF_DAYS로 넓힌다.
+# 정렬은 항상 published_at DESC — 범위를 넓혀도 최근 영상부터 처리된다.
+CUTOFF_DAYS = int(os.environ.get("SUMMARY_CUTOFF_DAYS", "30"))
 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
