@@ -166,6 +166,10 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
             maxResults=50,
             order="date",
         )
+        # search는 order=date로 정렬을 요청하지만 라이브 완료본은 publishedAt이 실제
+        # 방송일과 어긋나는 경우가 있어 여기서도 조기 return 대신 연속 카운트로 끊는다.
+        STALE_RUN_LIMIT = 200
+        stale_run = 0
         while req:
             resp = req.execute()
             for item in resp.get("items", []):
@@ -174,7 +178,11 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
                 published_at = item["snippet"]["publishedAt"]
                 pub_dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
                 if cutoff and pub_dt < cutoff:
-                    return _finalize(videos)
+                    stale_run += 1
+                    if stale_run >= STALE_RUN_LIMIT:
+                        return _finalize(videos)
+                    continue
+                stale_run = 0
                 videos.append({"url": f"https://www.youtube.com/watch?v={vid}", "vid": vid, "title": title, "meta": published_at[:10], "channel": ch["name"]})
                 if max_videos > 0 and len(videos) >= max_videos:
                     return _finalize(videos)
@@ -186,6 +194,13 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
             playlistId=uploads_id,
             maxResults=50,
         )
+        # uploads 플레이리스트는 대체로 최신순이지만 정렬이 보장되지 않는다.
+        # 특히 라이브는 예약 생성 시각이 publishedAt이 되기도 해서 순서가 뒤섞인다.
+        # 예전엔 cutoff 미달을 하나 만나면 바로 return했는데, 그 탓에 알상무는 9번째 항목
+        # 하나 때문에 30일치 92건 중 8건만 받고 끝났다(2026-09-01 확인).
+        # 이제는 건너뛰되, 연속으로 오래된 항목이 이어지면 그때 멈춘다.
+        STALE_RUN_LIMIT = 200  # 50개짜리 4페이지 연속으로 cutoff 밖이면 과거 구간으로 판단
+        stale_run = 0
         while req:
             resp = req.execute()
             for item in resp.get("items", []):
@@ -195,7 +210,11 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
                 published_at = snippet["publishedAt"]
                 pub_dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
                 if cutoff and pub_dt < cutoff:
-                    return _finalize(videos)
+                    stale_run += 1
+                    if stale_run >= STALE_RUN_LIMIT:
+                        return _finalize(videos)
+                    continue
+                stale_run = 0
                 videos.append({"url": f"https://www.youtube.com/watch?v={vid}", "vid": vid, "title": title, "meta": published_at[:10], "channel": ch["name"]})
                 if max_videos > 0 and len(videos) >= max_videos:
                     return _finalize(videos)
