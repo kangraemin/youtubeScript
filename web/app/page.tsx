@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { supabase, Transcript } from '@/lib/supabase'
 import { STOCK_ECON_SLUGS, getChannelMeta } from '@/lib/channels'
 import { SearchableFeed } from '@/components/SearchableFeed'
+import { SHORTS_THRESHOLD_SEC } from '@/components/ShortsFilter'
 
 export const revalidate = 3600
 
@@ -28,6 +29,8 @@ async function fetchChannelStats(): Promise<ChannelStat[]> {
     agg.set(r.channel_slug, { count: r.count_summarized, latest: r.latest_published_at })
   }
 
+  // 요약 0건 채널은 숨긴다. 카드를 눌러도 빈 목록만 나와서 헛걸음이 된다
+  // (새로 등록한 채널은 첫 요약이 쌓이는 순간 자동으로 나타난다).
   return STOCK_ECON_SLUGS.map((slug) => {
     const a = agg.get(slug)
     return {
@@ -35,18 +38,21 @@ async function fetchChannelStats(): Promise<ChannelStat[]> {
       count_summarized: a?.count ?? 0,
       latest_published_at: a?.latest ?? null,
     }
-  })
+  }).filter((s) => s.count_summarized > 0)
 }
 
 // 최신 피드 첫 페이지를 서버에서 미리 가져온다.
 // 예전엔 피드가 클라이언트 마운트 후에야 RPC를 쳐서, 사용자는 JS 로드 + 왕복이 끝날 때까지
 // 빈 화면을 봤다. ISR(1h)로 캐시되므로 대부분의 방문에서 추가 비용도 없다.
+//
+// 쇼츠 숨김이 기본값이므로 서버 데이터도 같은 기준으로 가져온다.
+// 기준이 어긋나면 기본 사용자가 카드를 봤다가 다시 로딩되는 깜빡임을 겪는다.
 async function fetchInitialFeed(): Promise<Transcript[]> {
   const { data, error } = await supabase.rpc('feed_summaries', {
     p_channel: null,
     p_limit: 20,
     p_offset: 0,
-    p_min_duration: 0,
+    p_min_duration: SHORTS_THRESHOLD_SEC,
   })
   if (error) throw error
   return (data ?? []) as Transcript[]

@@ -42,9 +42,12 @@ export function InfiniteList({
   // items.length를 offset으로 쓰면 걸러낸 만큼 범위가 겹쳐 중복이 생긴다.
   const fetchedCount = useRef(0)
 
+  // 저장된 필터 값을 읽기 전에는 목록을 건드리지 않는다.
+  // 먼저 읽지 않으면 기본값(false)으로 한 번 fetch하고, 값이 정해진 뒤 또 fetch해서 왕복이 두 번 난다.
+  const [hydrated, setHydrated] = useState(false)
   useEffect(() => {
-    const saved = readHideShorts()
-    if (saved) setHideShorts(true)
+    setHideShorts(readHideShorts())
+    setHydrated(true)
   }, [])
 
   // 상세→뒤로 시 재fetch 방지: items+done+scroll을 sessionStorage에 보존.
@@ -107,6 +110,7 @@ export function InfiniteList({
 
   // mount/키 변경: sessionStorage 캐시 있으면 복원(+스크롤), 없으면 리셋 후 첫 페이지 fetch.
   useEffect(() => {
+    if (!hydrated) return // 저장된 필터 값을 아직 모른다 — 확정 후 한 번만 돈다
     inFlight.current = false
     setError(null)
     let restored = false
@@ -132,8 +136,8 @@ export function InfiniteList({
       // 손상된 캐시 무시
     }
     if (!restored) {
-      // 서버가 준 첫 페이지는 필터 off 기준이라, 필터가 켜져 있으면 버리고 다시 가져온다.
-      const seeded = initialItems && initialItems.length > 0 && !hideShorts
+      // 서버가 준 첫 페이지는 쇼츠 숨김 기준이다. 필터를 끈 사용자에겐 조건이 안 맞으니 다시 가져온다.
+      const seeded = !!initialItems && initialItems.length > 0 && hideShorts
       setItems(seeded ? initialItems : [])
       setDone(false)
       fetchedCount.current = seeded ? initialItems.length : 0
@@ -142,7 +146,7 @@ export function InfiniteList({
       return () => cancelAnimationFrame(id)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, channelSlug, searchQuery, hideShorts])
+  }, [mode, channelSlug, searchQuery, hideShorts, hydrated])
 
   // items/done 변경 + 스크롤(throttle) 시 sessionStorage 기록.
   useEffect(() => {
