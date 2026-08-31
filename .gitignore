@@ -11,3 +11,6 @@ nohup.out
 # Supabase CLI cache
 supabase/.temp/
 .gstack/
+
+# ai-bouncer 런타임 상태
+.ai-bouncer/
