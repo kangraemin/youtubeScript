@@ -62,17 +62,17 @@ export function InfiniteList({
     try {
       const from = fetchedCount.current
       const to = from + pageSize - 1
-      const cols = 'vid,channel,channel_slug,title,published_at,summary,summarized_at'
-
       let data: Transcript[] | null = null
       let err: { message: string } | null = null
 
       if (mode === 'search') {
-        // 검색 RPC는 길이 조건을 받지 않으므로 결과를 클라이언트에서 걸러낸다.
-        const r = await supabase
-          .rpc('search_transcripts', { q_input: searchQuery ?? '' })
-          .select(cols)
-          .range(from, to)
+        // 페이지네이션은 서버에서 한다. 예전엔 매칭 행을 전부 만들어 보낸 뒤 range로 잘라서,
+        // '삼성전자' 한 번에 440행 4MB가 오갔다.
+        const r = await supabase.rpc('search_transcripts', {
+          q_input: searchQuery ?? '',
+          p_limit: pageSize,
+          p_offset: from,
+        })
         data = r.data as Transcript[] | null
         err = r.error
       } else {
