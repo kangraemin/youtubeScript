@@ -67,7 +67,7 @@ as $$
       t.title ilike '%' || q_input || '%'
       or t.summary::text ilike '%' || q_input || '%'
     )
-  order by t.published_at desc nulls last
+  order by t.published_at desc nulls last, t.vid desc
   limit p_limit offset p_offset
 $$;
 

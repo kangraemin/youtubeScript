@@ -45,7 +45,7 @@ as $$
   where t.summary is not null
     and (p_channel is null or t.channel_slug = p_channel)
     and (p_min_duration <= 0 or t.duration_sec >= p_min_duration)
-  order by t.published_at desc nulls last
+  order by t.published_at desc nulls last, t.vid desc
   limit p_limit offset p_offset
 $$;
 

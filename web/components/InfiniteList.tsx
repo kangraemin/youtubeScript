@@ -99,7 +99,13 @@ export function InfiniteList({
         mode === 'search' && hideShorts
           ? raw.filter((t) => (t.duration_sec ?? -1) >= SHORTS_THRESHOLD_SEC)
           : raw
-      setItems((prev) => [...prev, ...next])
+      // 이미 그린 영상은 걸러낸다.
+      // 첫 페이지는 ISR(1h) 캐시에서 온 스냅샷인데 다음 페이지는 실시간 offset이라,
+      // 그사이 새 요약이 N건 쌓이면 목록이 N칸 밀려 앞 페이지 항목이 다시 내려온다.
+      setItems((prev) => {
+        const seen = new Set(prev.map((t) => t.vid))
+        return [...prev, ...next.filter((t) => !seen.has(t.vid))]
+      })
       // 끝 판정은 걸러낸 뒤가 아니라 서버가 준 원본 개수로 해야 조기 종료되지 않는다.
       if (raw.length < pageSize) setDone(true)
     } finally {
