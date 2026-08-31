@@ -38,6 +38,11 @@ CHANNELS = [
     {"id": "UCIipmgxpUxDmPP-ma3Ahvbw", "slug": "mk_wallstreet",      "name": "매경 월가월부",      "tab": "videos"},
     {"id": "UChY8VUjXv0aA7RF9hDQ0ISg", "slug": "sbs_gyoyangi",       "name": "교양이를 부탁해",    "tab": "videos"},
     {"id": "",                           "slug": "aspim_research",     "name": "애스핌 리서치",      "tab": "videos", "handle": "ASPIM_research"},
+    # 머니코믹스에서 분리된 두 채널 (2026-08 확인)
+    # 알상무: 머니코믹스 하차 후 독립. 매일 아침 "당일전략"(9~19분)이 핵심이라 쇼츠 필터를 걸지 않는다.
+    {"id": "UCiDmfbYvuMEVbRxPmFP4sng", "slug": "alsangmoo",          "name": "알상무",             "tab": "videos", "handle": "rsangmoo"},
+    # 위폴: 머니코믹스 아침방송 [바이킹스]가 분리된 슈카친구들 채널. 평일 아침 7시 20분 라이브.
+    {"id": "UCMnFS27HnroIc1D4ct37TUA", "slug": "wepoll",             "name": "위폴",               "tab": "videos", "handle": "wepoll_original"},
 ]
 
 

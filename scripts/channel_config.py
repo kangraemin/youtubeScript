@@ -17,13 +17,18 @@ STOCK_ECON_SLUGS = [
     "jisik_inside",
     "developmong",
     "doniggangpae",
+    # 머니코믹스에서 분리 독립. 매일 아침 "당일전략"이 9~19분이라 쇼츠 필터를 걸면 핵심이 날아간다
+    # (최근 100편 실측: 3분 미만 9%, 3~20분 26% 중 22편이 당일전략).
+    "alsangmoo",
 ]
 
 # 뉴스 채널 (요약 대상, 단 쇼츠 제외 — 본방만)
 NEWS_SLUGS = ["yonhap_economy"]
 
 # 투자 미디어 채널 (요약 대상, 쇼츠 제외 — 영상+라이브만)
-INVEST_MEDIA_SLUGS = ["mk_wallstreet", "aspim_research"]
+# 위폴은 머니코믹스 아침방송[바이킹스]이 분리된 채널. 최근 100편 실측에서 3분 미만이 30%인데
+# 3~20분 구간은 0편 — 쇼츠(0:22~1:21)와 본방(36~76분)으로 딱 갈려 180초 컷이 본방을 건드리지 않는다.
+INVEST_MEDIA_SLUGS = ["mk_wallstreet", "aspim_research", "wepoll"]
 
 # 교양 채널 (요약 대상, 쇼츠 제외 — 동영상만)
 CULTURE_SLUGS = ["sbs_gyoyangi"]

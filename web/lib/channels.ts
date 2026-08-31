@@ -18,6 +18,8 @@ export const CHANNEL_META: Record<string, ChannelMeta> = {
   mk_wallstreet: { slug: 'mk_wallstreet', name: '매경 월가월부', color: 'blue', hex: '#3b82f6' },
   sbs_gyoyangi: { slug: 'sbs_gyoyangi', name: '교양이를 부탁해', color: 'teal', hex: '#14b8a6' },
   aspim_research: { slug: 'aspim_research', name: '애스핌 리서치', color: 'cyan', hex: '#06b6d4' },
+  alsangmoo: { slug: 'alsangmoo', name: '알상무', color: 'indigo', hex: '#6366f1' },
+  wepoll: { slug: 'wepoll', name: '위폴', color: 'lime', hex: '#84cc16' },
 }
 
 export const STOCK_ECON_SLUGS = Object.keys(CHANNEL_META)
