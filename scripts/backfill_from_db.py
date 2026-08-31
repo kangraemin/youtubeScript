@@ -25,7 +25,7 @@ os.environ.setdefault("SUPABASE_URL", os.environ.get("NEXT_PUBLIC_SUPABASE_URL",
 os.environ.setdefault("SUPABASE_SERVICE_KEY", os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""))
 sys.path.insert(0, str(_ROOT / "worker"))
 sys.path.insert(0, str(_ROOT / "scripts"))
-from supabase_client import get_client
+from supabase_client import get_client, call_with_retry
 from crawl_youtube_transcripts import get_transcript, save_transcript
 
 
@@ -52,7 +52,7 @@ def main():
         q = db.table("transcripts").select("vid, channel, channel_slug, title, url, published_at").eq("has_transcript", False)
         if args.channel != "all":
             q = q.eq("channel_slug", args.channel)
-        r = q.range(page * 1000, (page + 1) * 1000 - 1).execute()
+        r = call_with_retry(lambda: q.range(page * 1000, (page + 1) * 1000 - 1).execute())
         rows.extend(r.data)
         if len(r.data) < 1000:
             break
@@ -102,7 +102,7 @@ def main():
             # 50개마다 has_transcript 일괄 세팅 (메타만, 본문 미기록)
             if len(BATCH) >= 50:
                 try:
-                    db.table("transcripts").update({"has_transcript": True}).in_("vid", BATCH).execute()
+                    call_with_retry(lambda: db.table("transcripts").update({"has_transcript": True}).in_("vid", BATCH).execute())
                 except Exception as e:
                     print(f"  update 에러: {e}")
                 print(f"  [{i}/{len(rows)}] ok={ok} fail={fail} — has_transcript {len(BATCH)}개 세팅", flush=True)
@@ -111,7 +111,7 @@ def main():
         # 나머지 세팅
         if BATCH:
             try:
-                db.table("transcripts").update({"has_transcript": True}).in_("vid", BATCH).execute()
+                call_with_retry(lambda: db.table("transcripts").update({"has_transcript": True}).in_("vid", BATCH).execute())
             except Exception as e:
                 print(f"  update 에러: {e}")
             print(f"  최종 has_transcript {len(BATCH)}개 세팅", flush=True)

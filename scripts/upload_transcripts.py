@@ -14,7 +14,7 @@ os.environ.setdefault("SUPABASE_URL", os.environ.get("NEXT_PUBLIC_SUPABASE_URL",
 os.environ.setdefault("SUPABASE_SERVICE_KEY", os.environ.get("SUPABASE_SERVICE_ROLE_KEY", ""))
 
 sys.path.insert(0, str(_ROOT / "worker"))
-from supabase_client import get_client
+from supabase_client import get_client, call_with_retry
 
 TRANSCRIPTS_DIR = _ROOT / "rawdata" / "transcripts"
 BATCH_SIZE = 100
@@ -62,7 +62,9 @@ def load_channel(slug_dir: Path) -> list[dict]:
 
 
 def upsert_batch(db, rows: list[dict]) -> int:
-    db.table("transcripts").upsert(rows, on_conflict="vid").execute()
+    # 2026-08-15 사고: cron 중첩으로 소켓이 고갈되자 여기서 전 채널이 [Errno 49]로 죽어
+    # "완료: 총 0개"가 17일간 반복됐다. 일시적 연결 오류는 백오프 재시도한다.
+    call_with_retry(lambda: db.table("transcripts").upsert(rows, on_conflict="vid").execute())
     return len(rows)
 
 

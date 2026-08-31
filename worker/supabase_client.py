@@ -1,10 +1,59 @@
 import os
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
 _ENV_LOCAL = Path(__file__).resolve().parent.parent / ".env.local"
+
+# EADDRNOTAVAIL(49), ECONNRESET(54), ETIMEDOUT(60), ECONNREFUSED(61), EHOSTDOWN(64), EHOSTUNREACH(65)
+_TRANSIENT_ERRNOS = {49, 54, 60, 61, 64, 65}
+
+# httpx/httpcore가 던지는 일시적 연결 계열 예외 (클래스명으로 판정 — httpx 임포트 의존 회피)
+_TRANSIENT_EXC_NAMES = {
+    "ConnectError",
+    "ConnectTimeout",
+    "ReadTimeout",
+    "ReadError",
+    "WriteError",
+    "RemoteProtocolError",
+    "PoolTimeout",
+}
+
+
+def _is_transient(exc: BaseException) -> bool:
+    """일시적 네트워크 오류인지 판정 — 소켓 고갈·연결 리셋·타임아웃 계열만 재시도 대상.
+
+    supabase-py는 httpx 예외를 그대로 올리거나 다른 예외로 감싸므로
+    __cause__/__context__ 체인을 따라 내려가며 확인한다.
+    """
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        if isinstance(cur, OSError) and cur.errno in _TRANSIENT_ERRNOS:
+            return True
+        if type(cur).__name__ in _TRANSIENT_EXC_NAMES:
+            return True
+        cur = cur.__cause__ or cur.__context__
+    return False
+
+
+def call_with_retry(fn, tries: int = 5, base_delay: float = 2.0):
+    """일시적 네트워크 오류에 한해 지수 백오프 재시도. 그 외 예외는 즉시 전파.
+
+    2026-08-15 사고: cron 중첩으로 소켓이 고갈되자 첫 DB 호출 한 번의 실패만으로
+    전 채널 작업이 '총 0개'로 끝났고 17일간 수집이 멈췄다.
+    공유 락(run-crawl.sh / cron_backfill.sh)이 1차 방어, 이 함수가 2차 방어다.
+    """
+    for i in range(tries):
+        try:
+            return fn()
+        except Exception as e:
+            if not _is_transient(e) or i == tries - 1:
+                raise
+            time.sleep(base_delay * (2 ** i))
 
 
 def get_client() -> Client:
