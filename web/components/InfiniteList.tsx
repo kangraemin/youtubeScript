@@ -15,6 +15,9 @@ type Props = {
   searchQuery?: string
   showChannel?: boolean
   pageSize?: number
+  // 서버에서 미리 가져온 첫 페이지. 있으면 마운트 즉시 그려서 빈 화면 → fetch 대기를 없앤다.
+  // 쇼츠 필터가 켜진 사용자에겐 조건이 맞지 않으므로 무시하고 다시 가져온다.
+  initialItems?: Transcript[]
 }
 
 export function InfiniteList({
@@ -23,8 +26,10 @@ export function InfiniteList({
   searchQuery,
   showChannel = true,
   pageSize = 20,
+  initialItems,
 }: Props) {
-  const [items, setItems] = useState<Transcript[]>([])
+  // 서버가 넘긴 첫 페이지로 시작 — 첫 페인트에 카드가 이미 있다.
+  const [items, setItems] = useState<Transcript[]>(initialItems ?? [])
   const [done, setDone] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -127,9 +132,12 @@ export function InfiniteList({
       // 손상된 캐시 무시
     }
     if (!restored) {
-      setItems([])
+      // 서버가 준 첫 페이지는 필터 off 기준이라, 필터가 켜져 있으면 버리고 다시 가져온다.
+      const seeded = initialItems && initialItems.length > 0 && !hideShorts
+      setItems(seeded ? initialItems : [])
       setDone(false)
-      fetchedCount.current = 0
+      fetchedCount.current = seeded ? initialItems.length : 0
+      if (seeded) return // 첫 페이지는 이미 화면에 있다 — 다음 페이지는 스크롤이 부르게 둔다
       const id = requestAnimationFrame(() => loadMore())
       return () => cancelAnimationFrame(id)
     }

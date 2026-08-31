@@ -18,8 +18,10 @@ export const CHANNEL_META: Record<string, ChannelMeta> = {
   mk_wallstreet: { slug: 'mk_wallstreet', name: '매경 월가월부', color: 'blue', hex: '#3b82f6' },
   sbs_gyoyangi: { slug: 'sbs_gyoyangi', name: '교양이를 부탁해', color: 'teal', hex: '#14b8a6' },
   aspim_research: { slug: 'aspim_research', name: '애스핌 리서치', color: 'cyan', hex: '#06b6d4' },
-  alsangmoo: { slug: 'alsangmoo', name: '알상무', color: 'indigo', hex: '#6366f1' },
-  wepoll: { slug: 'wepoll', name: '위폴', color: 'lime', hex: '#84cc16' },
+  // 기존 채널이 hue 160~260°(청록~보라)에 몰려 있어, 신규 2개는 비어 있던 구간에서 고른다.
+  // indigo(#6366f1)는 지식인사이드(258°)·매경(217°)과 20° 안쪽이라 카드가 나란히 놓이면 구분이 안 된다.
+  alsangmoo: { slug: 'alsangmoo', name: '알상무', color: 'fuchsia', hex: '#d946ef' }, // ~292°
+  wepoll: { slug: 'wepoll', name: '위폴', color: 'lime', hex: '#84cc16' }, // ~84°
 }
 
 export const STOCK_ECON_SLUGS = Object.keys(CHANNEL_META)

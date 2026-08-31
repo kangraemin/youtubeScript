@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { InfiniteList } from '@/components/InfiniteList'
+import { Transcript } from '@/lib/supabase'
 
-export function SearchableFeed() {
+// initialItems: 서버에서 미리 가져온 최신 피드 첫 페이지. 검색 모드에는 쓰지 않는다.
+export function SearchableFeed({ initialItems }: { initialItems?: Transcript[] }) {
   const [input, setInput] = useState('')
   const [q, setQ] = useState('')
 
@@ -30,7 +32,12 @@ export function SearchableFeed() {
       {q ? (
         <InfiniteList key={`s:${q}`} mode="search" searchQuery={q} pageSize={20} />
       ) : (
-        <InfiniteList key="latest" mode="latest-summarized" pageSize={20} />
+        <InfiniteList
+          key="latest"
+          mode="latest-summarized"
+          pageSize={20}
+          initialItems={initialItems}
+        />
       )}
     </>
   )

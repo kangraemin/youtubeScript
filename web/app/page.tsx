@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { supabase, Transcript } from '@/lib/supabase'
 import { STOCK_ECON_SLUGS, getChannelMeta } from '@/lib/channels'
 import { SearchableFeed } from '@/components/SearchableFeed'
 
@@ -12,31 +12,20 @@ type ChannelStat = {
 }
 
 async function fetchChannelStats(): Promise<ChannelStat[]> {
-  // summary 있는 행의 (channel_slug, published_at) 단일 쿼리로 수집 후 JS 집계.
-  // 채널 수 × 2쿼리(16 round-trip) → 1쿼리(+1000행 초과 시 range 페이지네이션).
-  const rows: { channel_slug: string; published_at: string | null }[] = []
-  const PAGE = 1000
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase
-      .from('transcripts')
-      .select('channel_slug,published_at')
-      .not('summary', 'is', null)
-      .range(from, from + PAGE - 1)
-    // 에러를 삼키면 0 결과가 ISR에 캐시됨(DB 일시 장애 때 홈 카운트 0 고착) → throw로 렌더 실패시켜 이전 캐시 유지
-    if (error) throw error
-    if (!data || data.length === 0) break
-    rows.push(...data)
-    if (data.length < PAGE) break
-  }
+  // 집계는 DB에서 한다(channel_stats RPC → 채널 수만큼의 행만 전송).
+  // 예전엔 summary 있는 행 전체를 1000개씩 끌어와 JS로 집계했는데,
+  // 요약 1,075건 기준 1,075행 전송 + 1.5초였고 요약이 늘수록 선형으로 느려졌다.
+  const { data, error } = await supabase.rpc('channel_stats')
+  // 에러를 삼키면 0 결과가 ISR에 캐시됨(DB 일시 장애 때 홈 카운트 0 고착) → throw로 렌더 실패시켜 이전 캐시 유지
+  if (error) throw error
 
   const agg = new Map<string, { count: number; latest: string | null }>()
-  for (const r of rows) {
-    const a = agg.get(r.channel_slug) ?? { count: 0, latest: null }
-    a.count += 1
-    if (r.published_at && (a.latest === null || r.published_at > a.latest)) {
-      a.latest = r.published_at
-    }
-    agg.set(r.channel_slug, a)
+  for (const r of (data ?? []) as {
+    channel_slug: string
+    count_summarized: number
+    latest_published_at: string | null
+  }[]) {
+    agg.set(r.channel_slug, { count: r.count_summarized, latest: r.latest_published_at })
   }
 
   return STOCK_ECON_SLUGS.map((slug) => {
@@ -49,8 +38,26 @@ async function fetchChannelStats(): Promise<ChannelStat[]> {
   })
 }
 
+// 최신 피드 첫 페이지를 서버에서 미리 가져온다.
+// 예전엔 피드가 클라이언트 마운트 후에야 RPC를 쳐서, 사용자는 JS 로드 + 왕복이 끝날 때까지
+// 빈 화면을 봤다. ISR(1h)로 캐시되므로 대부분의 방문에서 추가 비용도 없다.
+async function fetchInitialFeed(): Promise<Transcript[]> {
+  const { data, error } = await supabase.rpc('feed_summaries', {
+    p_channel: null,
+    p_limit: 20,
+    p_offset: 0,
+    p_min_duration: 0,
+  })
+  if (error) throw error
+  return (data ?? []) as Transcript[]
+}
+
 export default async function HomePage() {
-  const channelStats = await fetchChannelStats()
+  // 채널 통계와 첫 피드를 동시에 — 두 왕복을 직렬로 기다리지 않는다.
+  const [channelStats, initialFeed] = await Promise.all([
+    fetchChannelStats(),
+    fetchInitialFeed(),
+  ])
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -58,14 +65,18 @@ export default async function HomePage() {
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
           📺 주식·경제 요약 다이제스트
         </h1>
+        {/* 채널 수는 하드코딩하면 채널이 늘 때마다 어긋난다(실제 11개인데 "7개"로 방치됐었다).
+            갱신 주기도 revalidate 상수에서 직접 뽑아 문구와 동작이 갈라지지 않게 한다. */}
         <p className="text-sm text-zinc-500 mt-1">
-          7개 채널 영상의 매수·매도·관전 포인트를 한 곳에 모아봅니다 · 자동 갱신 60s
+          {STOCK_ECON_SLUGS.length}개 채널 영상의 매수·매도·관전 포인트를 한 곳에 모아봅니다 ·{' '}
+          {revalidate / 3600}시간마다 갱신
         </p>
       </header>
 
       <section className="mb-12">
         <h2 className="text-lg font-semibold mb-4 text-zinc-200">채널</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+        {/* 채널 11개 기준. xl:7이면 둘째 줄에 4개만 남아 어색하다 — 6열이면 6+5로 균형이 맞는다. */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
           {channelStats.map((s) => {
             const ch = getChannelMeta(s.slug)
             return (
@@ -95,7 +106,7 @@ export default async function HomePage() {
 
       <section>
         <h2 className="text-lg font-semibold text-zinc-200 mb-4">최신 요약</h2>
-        <SearchableFeed />
+        <SearchableFeed initialItems={initialFeed} />
       </section>
     </main>
   )
