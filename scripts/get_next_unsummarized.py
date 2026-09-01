@@ -15,14 +15,16 @@ import urllib.request
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.channel_config import SUMMARY_SLUGS
+from scripts.channel_config import SUMMARY_SLUGS, summary_window_sql
 
 TARGET_PATH = "/tmp/summarize_target.txt"
 CHUNK_SIZE = 320
 CLAIM_TIMEOUT_MIN = 10
-# 기본 30일(기존 cron 동작 유지). 밀린 물량을 소급 요약할 땐 SUMMARY_CUTOFF_DAYS로 넓힌다.
-# 정렬은 항상 published_at DESC — 범위를 넓혀도 최근 영상부터 처리된다.
-CUTOFF_DAYS = int(os.environ.get("SUMMARY_CUTOFF_DAYS", "30"))
+# 요약 범위는 채널 카테고리별 정책(channel_config.summary_days)이 정한다.
+#   경제(시황·뉴스·투자미디어) 30일 / 교양 제한 없음.
+# SUMMARY_CUTOFF_DAYS를 주면 그 값으로 전 채널을 일괄 덮어쓴다(일회성 소급 작업용).
+# 정렬은 항상 published_at DESC — 범위와 무관하게 최근 영상부터 처리된다.
+CUTOFF_OVERRIDE = os.environ.get("SUMMARY_CUTOFF_DAYS")
 
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -81,6 +83,10 @@ RAWDATA_DIR = os.path.join(PROJECT_ROOT, "rawdata", "transcripts")
 
 def main() -> int:
     slugs_sql = ",".join(f"'{s}'" for s in SUMMARY_SLUGS)
+    if CUTOFF_OVERRIDE:
+        window = f"published_at >= NOW() - INTERVAL '{int(CUTOFF_OVERRIDE)} days'"
+    else:
+        window = summary_window_sql()
     # transcript 본문은 DB에 없다(로컬 rawdata가 단일 소스). has_transcript로 큐 판정.
     query = f"""
     UPDATE public.transcripts
@@ -91,7 +97,7 @@ def main() -> int:
         AND has_transcript = true
         AND screened_out = false
         AND channel_slug IN ({slugs_sql})
-        AND published_at >= NOW() - INTERVAL '{CUTOFF_DAYS} days'
+        AND {window}
         AND (summary_started_at IS NULL
              OR summary_started_at < NOW() - INTERVAL '{CLAIM_TIMEOUT_MIN} minutes')
       ORDER BY published_at DESC

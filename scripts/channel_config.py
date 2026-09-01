@@ -59,16 +59,49 @@ SCREEN_SLUGS = {"jisik_inside", "yonhap_economy"}
 # === 카테고리 정책 ===
 # 미래 정책(workers, max_videos 등)도 같은 dict에 추가 가능
 # min_duration_sec > 0 이면 크롤 시 그 길이 미만 영상(쇼츠/단편) 제외
+# summary_days: 요약 큐에 넣을 영상의 나이 상한. 0 = 제한 없음(전부).
+#   시황·뉴스처럼 시의성이 전부인 콘텐츠는 한 달이 지나면 읽히지 않으므로 30일로 끊는다.
+#   교양(culture)은 개별 영상의 수명이 길어 오래된 것도 값이 있어 제한을 두지 않는다.
+#   days(크롤 범위)와는 별개 축이다 — 수집은 하되 요약만 안 할 수 있다.
 CATEGORY_POLICY = {
-    "stock_econ":   {"days": 30, "summary": True,  "min_duration_sec": 0},
-    "news":         {"days": 30, "summary": True,  "min_duration_sec": 180},
-    "invest_media": {"days": 30, "summary": True,  "min_duration_sec": 180},
-    "culture":      {"days": 30, "summary": True,  "min_duration_sec": 180},
-    "food":         {"days": 60, "summary": False, "min_duration_sec": 0},
-    "heavy":        {"days": 60, "summary": False, "min_duration_sec": 0},  # sampro_tv 등
+    "stock_econ":   {"days": 30, "summary": True,  "min_duration_sec": 0,   "summary_days": 30},
+    "news":         {"days": 30, "summary": True,  "min_duration_sec": 180, "summary_days": 30},
+    "invest_media": {"days": 30, "summary": True,  "min_duration_sec": 180, "summary_days": 30},
+    "culture":      {"days": 30, "summary": True,  "min_duration_sec": 180, "summary_days": 0},
+    "food":         {"days": 60, "summary": False, "min_duration_sec": 0,   "summary_days": 0},
+    "heavy":        {"days": 60, "summary": False, "min_duration_sec": 0,   "summary_days": 0},  # sampro_tv 등
 }
 
-DEFAULT_POLICY = {"days": 30, "summary": False, "min_duration_sec": 0}
+DEFAULT_POLICY = {"days": 30, "summary": False, "min_duration_sec": 0, "summary_days": 0}
+
+
+def summary_window_sql(alias: str = "") -> str:
+    """요약 큐용 published_at 조건 SQL. 카테고리별 summary_days를 그대로 반영한다.
+
+    경제(시황·뉴스·투자미디어)는 30일, 교양은 제한 없음 — 한 쿼리에서 채널마다
+    다른 창을 적용해야 해서 OR로 펼친다. 반환값은 괄호로 감싼 단일 조건식.
+    """
+    col = f"{alias}." if alias else ""
+    limited: dict[int, list[str]] = {}
+    unlimited: list[str] = []
+    for slug in SUMMARY_SLUGS:
+        d = policy_for(slug).get("summary_days", 0)
+        if d and d > 0:
+            limited.setdefault(d, []).append(slug)
+        else:
+            unlimited.append(slug)
+
+    parts = []
+    for days, slugs in sorted(limited.items()):
+        names = ",".join(f"'{s}'" for s in slugs)
+        parts.append(
+            f"({col}channel_slug IN ({names})"
+            f" AND {col}published_at >= NOW() - INTERVAL '{days} days')"
+        )
+    if unlimited:
+        names = ",".join(f"'{s}'" for s in unlimited)
+        parts.append(f"({col}channel_slug IN ({names}))")
+    return "(" + " OR ".join(parts) + ")"
 
 
 def category_of(slug: str) -> str:

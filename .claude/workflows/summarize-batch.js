@@ -28,13 +28,15 @@ const RESULT_SCHEMA = {
 const AGENT_PROMPT = `당신은 유튜브 주식·경제 transcript 요약 작업자입니다.
 아래 절차를 최대 ${PER_AGENT}회 반복합니다. 작업 디렉토리: ${ROOT}
 
+요약 범위는 채널 정책이 정한다(경제 30일 / 교양 제한없음) — 별도 환경변수를 붙이지 마라.
+
 0. 최초 1회만: ${ROOT}/prompts/summary-guidelines.md 를 Read 한다.
    (출력 JSON 스키마 13섹션 · quotes verbatim 규칙 · 추출 규칙의 정본이다.)
 
 각 회차:
 
 1. 대상 1편 claim:
-   cd ${ROOT} && source .env.local && SUMMARY_CUTOFF_DAYS=3650 .venv/bin/python scripts/get_next_unsummarized.py
+   cd ${ROOT} && source .env.local && .venv/bin/python scripts/get_next_unsummarized.py
    stdout의 마지막 JSON 라인을 파싱한다.
    - {"empty": true} 이면 즉시 중단하고 지금까지의 결과를 반환한다 (empty=true로 보고).
    - 정상이면 vid / channel_slug / title / transcript_path / transcript_lines / chunk_size / read_chunks 를 얻는다.
