@@ -54,17 +54,17 @@ export function ShortsFilter({ value, onChange }: Props) {
       /* min-h-11 = 44px. 모바일 탭 타깃 최소치이고, 이전엔 34px이라 누르기 까다로웠다. */
       className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2 text-sm transition-colors ${
         on
-          ? 'border-sky-500/60 bg-sky-500/15 text-sky-300'
+          ? 'border-[var(--accent)] bg-zinc-900 text-[var(--accent)]'
           : 'border-zinc-700 bg-zinc-900/60 text-zinc-400 hover:border-zinc-600 hover:text-zinc-300'
       }`}
     >
       <span
         className={`inline-block h-4 w-7 shrink-0 rounded-full p-0.5 transition-colors ${
-          on ? 'bg-sky-500' : 'bg-zinc-700'
+          on ? 'bg-[var(--accent)]' : 'bg-zinc-700'
         }`}
       >
         <span
-          className={`block h-3 w-3 rounded-full bg-white transition-transform ${
+          className={`block h-3 w-3 rounded-full bg-zinc-950 transition-transform ${
             on ? 'translate-x-3' : 'translate-x-0'
           }`}
         />

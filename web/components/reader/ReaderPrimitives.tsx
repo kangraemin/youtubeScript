@@ -13,7 +13,7 @@ export function SentenceList({ text }: { text: string }) {
 export function LimitedList({ items, label, bullets = false, compact = false }: { items: ReactNode[]; label: string; bullets?: boolean; compact?: boolean }) {
   const list = (children: ReactNode[]) => <ul className={compact ? 'flex flex-wrap gap-2' : bullets ? 'space-y-3' : 'divide-y divide-zinc-800/80'}>
     {children.map((item, i) => <li key={i} className={compact ? 'min-w-0 max-w-full' : bullets ? 'flex gap-3 text-sm' : 'py-4 first:pt-2'}>
-      {bullets && <span aria-hidden="true" className="mt-2.5 h-1 w-1 shrink-0 rounded-full bg-sky-300" />}
+      {bullets && <span aria-hidden="true" className="mt-2.5 h-1 w-1 shrink-0 rounded-full bg-zinc-500" />}
       <div className="min-w-0 flex-1">{item}</div>
     </li>)}
   </ul>

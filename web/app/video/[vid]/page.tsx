@@ -40,7 +40,7 @@ export default async function VideoPage({
 
       <article className="mt-5">
         <header className="border-b border-zinc-800 pb-6">
-          <p className="mb-3 text-xs font-medium tracking-widest text-sky-300">영상 요약</p>
+          <p className="mb-3 text-xs font-medium tracking-widest text-zinc-400">영상 요약</p>
           <h1 className="text-2xl font-bold leading-snug tracking-tight sm:text-3xl">{t.title}</h1>
           <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
             <span className="font-medium text-zinc-200">{ch.name}</span>

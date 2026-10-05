@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* 따뜻한 amber는 #0e0f12 대비 11.48:1로 AA를 충족하며 핵심 정보와 선택 상태를 구분한다. */
+  --accent: #fbbf24;
+}
+
 html, body {
   background: #0e0f12;
   color: #eaeaea;
@@ -11,7 +16,10 @@ html, body {
 
 @layer components {
   .reader-jump {
-    @apply inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white;
+    @apply inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-[var(--accent)];
+  }
+  .reader-jump[aria-current="location"] {
+    @apply bg-zinc-800 text-[var(--accent)] underline decoration-2 underline-offset-4;
   }
 }
 
@@ -48,11 +56,11 @@ details[open] > summary > span > .disclosure-arrow {
 }
 
 :where(a, button, input, summary):focus-visible {
-  outline: 2px solid #7dd3fc;
+  outline: 2px solid var(--accent);
   outline-offset: 3px;
   border-radius: 4px;
 }
 ::selection {
-  background: #7dd3fc;
+  background: var(--accent);
   color: #09090b;
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { Quote, Summary } from '@/lib/supabase'
+import { ReaderNav } from './reader/ReaderNav'
 import { QuoteList } from './QuoteList'
 import { LimitedList, SentenceList } from './reader/ReaderPrimitives'
 import { isHeadlineMeta, narrativeHeading, splitHeadline, splitNarrative } from './reader/text'
@@ -10,11 +11,11 @@ type ReaderSection = { id: string; title: string; items: ReactNode[] }
 export function SummaryCard({ vid, summary, channel }: Props) {
   if (!summary) return <p className="rounded-xl border border-zinc-800 p-6 text-sm text-zinc-400">아직 요약되지 않았어요.</p>
 
-  const row = (title: string, body?: string, speaker?: string | null, quotes?: Quote[], badge?: string, extra?: string) => (
-    <ReaderItem vid={vid} title={title} body={body} speaker={speaker} quotes={quotes} badge={badge} extra={extra} />
+  const row = (title: string, body?: string, speaker?: string | null, quotes?: Quote[], badge?: string, extra?: string, signal = false) => (
+    <ReaderItem vid={vid} title={title} body={body} speaker={speaker} quotes={quotes} badge={badge} extra={extra} signal={signal} />
   )
   const sections: ReaderSection[] = [
-    { id: 'verdicts', title: '결론·시그널', items: summary.verdicts?.map(it => row(it.condition, it.consequence, it.speaker, it.quotes)) ?? [] },
+    { id: 'verdicts', title: '결론·시그널', items: summary.verdicts?.map(it => row(it.condition, it.consequence, it.speaker, it.quotes, undefined, undefined, true)) ?? [] },
     { id: 'narrative', title: '영상 흐름', items: summary.narrative ? splitNarrative(summary.narrative).map((step, i) => {
       const { time, title } = narrativeHeading(step)
       return <details className="reader-flow">
@@ -42,8 +43,8 @@ export function SummaryCard({ vid, summary, channel }: Props) {
   const hasOverview = Boolean(meta || headlines.length || verdicts.length)
 
   return <div className="summary-body min-w-0">
-    {hasOverview && <section id="overview" aria-labelledby="overview-heading" className="scroll-mt-24 pb-7">
-      <h2 id="overview-heading" className="mb-3 text-lg font-semibold tracking-tight">핵심 포인트</h2>
+    {hasOverview && <section id="overview" aria-labelledby="overview-heading" className="mb-7 scroll-mt-24 border-l-4 border-[var(--accent)] pl-4">
+      <h2 id="overview-heading" className="mb-3 text-lg font-semibold tracking-tight text-[var(--accent)]">핵심 포인트</h2>
       <div className="max-h-[65svh] overflow-y-auto" role="region" aria-label="핵심 포인트 목록" tabIndex={0}>
         {meta && <p className="mb-2 text-xs text-zinc-400">{meta}</p>}
         {headlines.length > 0 && <ul className="list-disc space-y-2 pl-4 text-sm text-zinc-200 marker:text-zinc-500">
@@ -52,7 +53,7 @@ export function SummaryCard({ vid, summary, channel }: Props) {
         {verdicts.length > 0 && <ul className="mt-3 list-disc space-y-2 pl-4 text-sm text-zinc-300 marker:text-zinc-500">
           {verdicts.map((verdict, i) => <li key={i}>
             <span>{verdict.condition}</span>{' '}
-            <span className={verdict.condition.length + verdict.consequence.length > 48 ? 'block' : ''}>→ {verdict.consequence}</span>
+            <span className={verdict.condition.length + verdict.consequence.length > 48 ? 'block' : ''}><span className="font-semibold text-[var(--accent)]">→</span> {verdict.consequence}</span>
           </li>)}
         </ul>}
       </div>
@@ -67,17 +68,15 @@ export function SummaryCard({ vid, summary, channel }: Props) {
     </details>}
 
     {sections.length > 0 && <>
-      <nav aria-label="요약 목차" className="sticky top-0 z-10 mb-8 min-w-0 border-y border-zinc-800 bg-bg/95 backdrop-blur">
-        <div className="flex gap-1 overflow-x-auto py-2">
-          {hasOverview && <a href="#overview" className="reader-jump">핵심 포인트</a>}
-          {sections.map(section => <a key={section.id} href={`#${section.id}`} className="reader-jump">{section.title}</a>)}
-        </div>
-      </nav>
+      <ReaderNav sections={[
+        ...(hasOverview ? [{ id: 'overview', title: '핵심 포인트' }] : []),
+        ...sections.map(({ id, title }) => ({ id, title })),
+      ]} />
       <div className="space-y-9">
         {sections.map(section => <section key={section.id} id={section.id} aria-labelledby={`${section.id}-heading`} className="scroll-mt-24">
           <div className="mb-2 flex items-baseline gap-2 border-b border-zinc-700 pb-3">
             <h2 id={`${section.id}-heading`} className="text-lg font-semibold tracking-tight">{section.title}</h2>
-            <span className="text-xs tabular-nums text-zinc-400">{section.items.length}</span>
+            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs tabular-nums text-[var(--accent)]">{section.items.length}</span>
           </div>
           <LimitedList items={section.items} label={section.title} />
         </section>)}
@@ -86,19 +85,20 @@ export function SummaryCard({ vid, summary, channel }: Props) {
   </div>
 }
 
-function ReaderItem({ vid, title, body, speaker, quotes, badge, extra }: {
-  vid: string; title: string; body?: string; speaker?: string | null; quotes?: Quote[]; badge?: string; extra?: string
+function ReaderItem({ vid, title, body, speaker, quotes, badge, extra, signal = false }: {
+  vid: string; title: string; body?: string; speaker?: string | null; quotes?: Quote[]; badge?: string; extra?: string; signal?: boolean
 }) {
   return <div className="min-w-0">
     <details className="reader-item">
       <summary className="min-h-11 cursor-pointer py-1">
         <span className="flex min-w-0 items-center gap-2">
+          {signal && <span className="shrink-0 text-xs font-medium text-[var(--accent)]">조건</span>}
           <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-zinc-100">{title}</span>
           {badge && <span className="shrink-0 rounded border border-zinc-700 px-1.5 py-0.5 text-xs font-normal text-zinc-300">{badge}</span>}
           <span aria-hidden="true" className="disclosure-arrow shrink-0 text-zinc-400">⌄</span>
         </span>
         {speaker && <span className="block truncate text-xs text-zinc-400">{speaker}</span>}
-        {(body || extra) && <span className="reader-preview mt-1 line-clamp-2 text-sm text-zinc-300">{[body, extra].filter(Boolean).join(' · ')}</span>}
+        {(body || extra) && <span className="reader-preview mt-1 line-clamp-2 text-sm text-zinc-300">{signal && <span className="font-semibold text-[var(--accent)]">→ </span>}{[body, extra].filter(Boolean).join(' · ')}</span>}
       </summary>
       <div className="space-y-3 py-3">
         <SentenceList text={title} />

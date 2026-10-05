@@ -46,7 +46,7 @@ export function VideoCard({ t, showChannel = true, searchQuery }: Props) {
                 <span className="text-zinc-400">
                   {r.parts.map((p, j) =>
                     p.hl ? (
-                      <mark key={j} className="bg-sky-300 text-zinc-950 rounded px-0.5">
+                      <mark key={j} className="bg-[var(--accent)] text-zinc-950 rounded px-0.5">
                         {p.text}
                       </mark>
                     ) : (
@@ -58,6 +58,12 @@ export function VideoCard({ t, showChannel = true, searchQuery }: Props) {
             ))}
           </div>
         )}
+        <div className="flex flex-wrap gap-1 empty:hidden mb-2" aria-label="포지션 태그">
+          <CountChip label="매수" count={s?.buys?.length ?? t.n_buys} tone="buy" />
+          <CountChip label="매도" count={s?.sells?.length ?? t.n_sells} tone="sell" />
+          <CountChip label="관전" count={s?.watchlist?.length ?? t.n_watch} />
+          <CountChip label="용어" count={s?.terms?.length ?? t.n_terms} />
+        </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">
           {showChannel && <span>{ch.name}</span>}
           {t.published_at && <time dateTime={t.published_at}>{t.published_at.slice(0, 10)}</time>}
@@ -65,4 +71,11 @@ export function VideoCard({ t, showChannel = true, searchQuery }: Props) {
       </div>
     </Link>
   )
+}
+
+function CountChip({ label, count, tone }: { label: string; count?: number | null; tone?: 'buy' | 'sell' }) {
+  if (!count || count < 0) return null
+  const color = tone === 'buy' ? 'bg-emerald-950 text-emerald-300'
+    : tone === 'sell' ? 'bg-rose-950 text-rose-300' : 'bg-zinc-800 text-zinc-300'
+  return <span className={`whitespace-nowrap rounded px-1 py-0.5 text-xs tabular-nums ${color}`}>{label} {count}</span>
 }

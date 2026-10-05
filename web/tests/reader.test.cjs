@@ -131,21 +131,31 @@ test('항목 설명과 부가 정보는 합쳐서 두 줄 미리보기이며 원
 })
 
 
-test('피드는 경량 응답·전체 요약·검색 근거를 유지하고 개수 칩은 제거한다', () => {
+test('피드는 경량 응답·전체 요약·검색 근거와 포지션 태그를 유지한다', () => {
   const { VideoCard } = require('../components/VideoCard.tsx')
   const { getMatchReasons } = require('../lib/matchReason.ts')
   const transcript = {
     vid: 'feed-video', channel: '테스트 채널', channel_slug: 'test-channel', title: '엔비디아 실적 분석',
-    published_at: '2026-10-05', summarized_at: null, headline: '경량 헤드라인', n_buys: 7,
+    published_at: '2026-10-05', summarized_at: null, headline: '경량 헤드라인', n_buys: 7, n_sells: 2, n_watch: 3, n_terms: 4,
   }
   const light = renderToStaticMarkup(React.createElement(VideoCard, { t: transcript }))
   assert.ok(light.includes('경량 헤드라인'))
   assert.ok(light.includes('2026-10-05'))
-  assert.doesNotMatch(plain(light), /매수 7/)
+  for (const tag of ['매수 7', '매도 2', '관전 3', '용어 4']) assert.ok(plain(light).includes(tag))
   const full = { ...transcript, summary: { headline: '전체 헤드라인', buys: [{ ticker: '삼성전자', reason: '저평가 매수', speaker: null, quotes: [] }] } }
   const searched = renderToStaticMarkup(React.createElement(VideoCard, { t: full, searchQuery: '삼성전자' }))
   assert.ok(searched.includes('전체 헤드라인'))
   assert.ok(searched.includes('<mark'))
+  assert.ok(plain(searched).includes('매수 1'))
+  assert.ok(!plain(searched).includes('매수 7'))
+  const empty = renderToStaticMarkup(React.createElement(VideoCard, {
+    t: { ...transcript, summary: { buys: [], sells: [], watchlist: [], terms: [] } }, showChannel: false,
+  }))
+  assert.doesNotMatch(plain(empty), /(?:매수|매도|관전|용어) \d+/)
+  const missing = renderToStaticMarkup(React.createElement(VideoCard, {
+    t: { vid: 'empty', channel: '채널', channel_slug: 'test', title: '빈 카드', n_buys: 0, n_sells: null },
+  }))
+  assert.doesNotMatch(plain(missing), /(?:매수|매도|관전|용어) \d+/)
   assert.equal(getMatchReasons(full, '삼성전자')[0].label, '매수 코멘트')
   assert.deepEqual(getMatchReasons(full, '존재안함토큰'), [])
 })
