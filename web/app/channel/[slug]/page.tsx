@@ -26,12 +26,12 @@ export default async function ChannelPage({
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      <Link href="/" className="text-sm text-zinc-400 hover:text-zinc-200">
+      <Link href="/" className="inline-flex min-h-11 min-w-11 items-center text-sm text-zinc-400 hover:text-zinc-200">
         ← 홈
       </Link>
 
-      <header className="mt-3 mb-8">
-        <h1 className="text-3xl font-bold tracking-tight" style={{ color: ch.hex }}>
+      <header className="mt-3 mb-8 border-b border-zinc-800 pb-6">
+        <h1 className="text-3xl font-bold tracking-tight">
           {ch.name}
         </h1>
         <p className="text-sm text-zinc-400 mt-1">요약 {totalSummarized}편</p>

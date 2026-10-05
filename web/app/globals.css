@@ -6,12 +6,53 @@ html, body {
   background: #0e0f12;
   color: #eaeaea;
   font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif;
+  overflow-wrap: anywhere;
 }
 
-/* 요약 본문 행간 — 한글 본문 권장 1.6~1.7. Tailwind text-sm은 행간 1.43(20px/14px)을 같이 박아서
-   상세 본문이 빽빽했다(2026-10-05 실측). 유틸리티보다 구체적인 선택자로 덮는다. */
+@layer components {
+  .reader-jump {
+    @apply inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white;
+  }
+}
+
+/* 숨겨진 본문도 서버 HTML에 보존하면서 기본 화면의 정보량을 줄인다. */
 .summary-body p,
 .summary-body li,
 .summary-body span {
+  line-height: 1.65;
+}
+.summary-body summary {
+  list-style: none;
+}
+.summary-body .reader-sentences li,
+.summary-body .reader-sentences span {
   line-height: 1.7;
+}
+.summary-body summary::-webkit-details-marker {
+  display: none;
+}
+.reader-more > summary .more-open,
+.reader-more[open] > summary .more-closed,
+.reader-item[open] > summary .reader-preview {
+  display: none;
+}
+.reader-more[open] > summary .more-open {
+  display: inline;
+}
+.disclosure-arrow {
+  display: inline-block;
+}
+details[open] > summary > .disclosure-arrow,
+details[open] > summary > span > .disclosure-arrow {
+  transform: rotate(180deg);
+}
+
+:where(a, button, input, summary):focus-visible {
+  outline: 2px solid #7dd3fc;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+::selection {
+  background: #7dd3fc;
+  color: #09090b;
 }

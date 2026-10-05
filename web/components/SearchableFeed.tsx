@@ -41,10 +41,11 @@ export function SearchableFeed({ initialItems }: { initialItems?: Transcript[] }
     <>
       <input
         type="search"
+        aria-label="회사·티커 검색"
         value={input}
         onChange={(e) => setInput(e.target.value)}
         placeholder="회사·티커 검색 (예: 삼성전자, 엔비디아, TSLA)"
-        className="w-full mb-2 rounded border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-400 focus:border-violet-500 outline-none transition-colors"
+        className="w-full min-h-11 mb-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2.5 text-base sm:text-sm text-zinc-100 placeholder:text-zinc-400 focus:border-sky-300 transition-colors"
       />
       {tooShort && <div className="text-xs text-zinc-400 mb-3">2자 이상 입력하세요</div>}
       {q && <div className="text-xs text-zinc-400 mb-3">‘{q}’ 검색 결과</div>}

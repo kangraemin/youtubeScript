@@ -205,7 +205,7 @@ export function InfiniteList({
       </div>
 
       {items.length === 0 && !loading ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-500">
+        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-400">
           {hideShorts ? '3분 이상 영상이 없어요. 필터를 꺼보세요.' : '표시할 영상이 없어요.'}
         </div>
       ) : (
@@ -224,7 +224,7 @@ export function InfiniteList({
       {/* Sentinel — 끝나면 안 그림 */}
       {!done && (
         <div ref={sentinelRef} className="mt-8 flex items-center justify-center py-6">
-          <span className="text-sm text-zinc-500">
+          <span className="text-sm text-zinc-400">
             {loading ? '불러오는 중…' : '아래로 스크롤'}
           </span>
         </div>
@@ -244,7 +244,7 @@ export function InfiniteList({
               inFlight.current = false
               loadMore()
             }}
-            className="ml-2 underline"
+            className="ml-2 min-h-11 min-w-11 underline"
           >
             다시 시도
           </button>

@@ -67,13 +67,13 @@ export default async function HomePage() {
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      <header className="mb-4">
-        <h1 className="text-xl sm:text-3xl font-bold tracking-tight">
-          📺 주식·경제 요약 다이제스트
+      <header className="mb-6 border-b border-zinc-800 pb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+          주식·경제 다이제스트
         </h1>
         {/* 채널 수는 하드코딩하면 채널이 늘 때마다 어긋난다(실제 11개인데 "7개"로 방치됐었다).
             갱신 주기도 revalidate 상수에서 직접 뽑아 문구와 동작이 갈라지지 않게 한다. */}
-        <p className="text-sm text-zinc-400 mt-1">
+        <p className="text-sm leading-relaxed text-zinc-400 mt-3">
           {STOCK_ECON_SLUGS.length}개 채널 영상의 매수·매도·관전 포인트를 한 곳에 모아봅니다 ·{' '}
           {revalidate / 3600}시간마다 갱신
         </p>
@@ -90,11 +90,15 @@ export default async function HomePage() {
                 <Link
                   href={`/channel/${s.slug}`}
                   title={s.latest_published_at ? `최근 ${s.latest_published_at}` : undefined}
-                  className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-700 bg-zinc-900/60 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500"
+                  className="flex min-h-11 items-center gap-3 whitespace-nowrap rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-600"
                 >
-                  <span className="h-2 w-2 rounded-full" style={{ background: ch.hex }} />
-                  {ch.name}
-                  <span className="text-xs text-zinc-400">{s.count_summarized}</span>
+                  <span>
+                    <span className="block font-medium">{ch.name}</span>
+                    <span className="block text-xs text-zinc-400">
+                      {s.latest_published_at ? `최근 업로드 ${s.latest_published_at.slice(0, 10)}` : '업로드 날짜 없음'}
+                    </span>
+                  </span>
+                  <span className="text-xs tabular-nums text-zinc-400">{s.count_summarized}편</span>
                 </Link>
               </li>
             )

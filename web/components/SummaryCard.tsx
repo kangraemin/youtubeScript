@@ -1,253 +1,112 @@
-import { Summary } from '@/lib/supabase'
+import type { ReactNode } from 'react'
+import type { Quote, Summary } from '@/lib/supabase'
 import { QuoteList } from './QuoteList'
+import { LimitedList, SentenceList } from './reader/ReaderPrimitives'
+import { isHeadlineMeta, narrativeHeading, splitHeadline, splitNarrative } from './reader/text'
 
-type Props = { vid: string; summary: Summary | null }
+type Props = { vid: string; summary: Summary | null; channel?: string }
+type ReaderSection = { id: string; title: string; items: ReactNode[] }
 
-export function SummaryCard({ vid, summary }: Props) {
-  if (!summary) {
-    return (
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-center text-zinc-400">
-        아직 요약되지 않았어요. /loop이 처리 중입니다.
+export function SummaryCard({ vid, summary, channel }: Props) {
+  if (!summary) return <p className="rounded-xl border border-zinc-800 p-6 text-sm text-zinc-400">아직 요약되지 않았어요.</p>
+
+  const row = (title: string, body?: string, speaker?: string | null, quotes?: Quote[], badge?: string, extra?: string) => (
+    <ReaderItem vid={vid} title={title} body={body} speaker={speaker} quotes={quotes} badge={badge} extra={extra} />
+  )
+  const sections: ReaderSection[] = [
+    { id: 'verdicts', title: '결론·시그널', items: summary.verdicts?.map(it => row(it.condition, it.consequence, it.speaker, it.quotes)) ?? [] },
+    { id: 'narrative', title: '영상 흐름', items: summary.narrative ? splitNarrative(summary.narrative).map((step, i) => {
+      const { time, title } = narrativeHeading(step)
+      return <details className="reader-flow">
+        <summary className="flex min-h-11 cursor-pointer items-center gap-3">
+          <span className="shrink-0 font-mono text-xs text-sky-300">{time || String(i + 1).padStart(2, '0')}</span>
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{title}</span>
+          <span aria-hidden="true" className="disclosure-arrow text-zinc-400">⌄</span>
+        </summary>
+        <div className="pb-2 pt-3"><SentenceList text={step} /></div>
+      </details>
+    }) : [] },
+    { id: 'buys', title: '매수', items: summary.buys?.map(it => row(it.ticker, it.reason, it.speaker, it.quotes)) ?? [] },
+    { id: 'sells', title: '매도', items: summary.sells?.map(it => row(it.ticker, it.reason, it.speaker, it.quotes)) ?? [] },
+    { id: 'macro', title: '거시 진단', items: summary.macro_views?.map(it => row(it.topic, it.view, it.speaker, it.quotes)) ?? [] },
+    { id: 'chart', title: '차트 자리', items: summary.chart_levels?.map(it => row(it.ticker, it.reason, it.speaker, it.quotes, undefined, it.level)) ?? [] },
+    { id: 'watchlist', title: '봐야 할 것', items: summary.watchlist?.map(it => row(it.topic, it.reason, it.speaker, it.quotes)) ?? [] },
+    { id: 'lessons', title: '학습 포인트', items: summary.lessons?.map(it => row(it.lesson, undefined, it.speaker, it.quotes, it.type)) ?? [] },
+    { id: 'data', title: '통계·숫자', items: summary.data_points?.map(it => row(it.datum, undefined, undefined, it.quotes)) ?? [] },
+    { id: 'actions', title: '실행 가능', items: summary.action_items?.map(it => row(it.action, undefined, it.speaker, it.quotes)) ?? [] },
+    { id: 'terms', title: '용어', items: summary.terms?.map(it => row(it.term, it.explain, undefined, it.quotes, it.source, it.context)) ?? [] },
+  ].filter(section => section.items.length > 0)
+  const headlines = summary.headline ? splitHeadline(summary.headline) : []
+  const meta = headlines[0] && isHeadlineMeta(headlines[0], channel) ? headlines.shift() : undefined
+  const verdicts = summary.verdicts?.slice(0, 3) ?? []
+  const hasOverview = Boolean(meta || headlines.length || verdicts.length)
+
+  return <div className="summary-body min-w-0">
+    {hasOverview && <section id="overview" aria-labelledby="overview-heading" className="scroll-mt-24 pb-7">
+      <h2 id="overview-heading" className="mb-3 text-lg font-semibold tracking-tight">핵심 포인트</h2>
+      <div className="max-h-[65svh] overflow-y-auto" role="region" aria-label="핵심 포인트 목록" tabIndex={0}>
+        {meta && <p className="mb-2 text-xs text-zinc-400">{meta}</p>}
+        {headlines.length > 0 && <ul className="list-disc space-y-2 pl-4 text-sm text-zinc-200 marker:text-zinc-500">
+          {headlines.map((point, i) => <li key={i}>{point}</li>)}
+        </ul>}
+        {verdicts.length > 0 && <ul className="mt-3 list-disc space-y-2 pl-4 text-sm text-zinc-300 marker:text-zinc-500">
+          {verdicts.map((verdict, i) => <li key={i}>
+            <span>{verdict.condition}</span>{' '}
+            <span className={verdict.condition.length + verdict.consequence.length > 48 ? 'block' : ''}>→ {verdict.consequence}</span>
+          </li>)}
+        </ul>}
       </div>
-    )
-  }
+    </section>}
 
-  return (
-    <div className="summary-body space-y-8">
-      {summary.raw_summary && (
-        <section className="rounded-xl border border-sky-500/25 bg-sky-500/5 p-4 sm:p-5">
-          <h2 className="text-sm font-semibold text-sky-300 mb-2">핵심 요약</h2>
-          <p className="text-[15px] text-zinc-100">{summary.raw_summary}</p>
-        </section>
-      )}
+    {summary.raw_summary && <details className="reader-full-summary mb-7 border-y border-zinc-800">
+      <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 text-sm text-zinc-300">
+        전체 요약 읽기
+        <span aria-hidden="true" className="disclosure-arrow text-zinc-400">⌄</span>
+      </summary>
+      <div className="py-3"><SentenceList text={summary.raw_summary} /></div>
+    </details>}
 
-      {summary.verdicts && summary.verdicts.length > 0 && (
-        <Section icon="⚡" title="결론·시그널" color="orange">
-          {summary.verdicts.map((it, i) => (
-            <ItemCard key={i} accent="orange">
-              <div className="text-sm">
-                <span className="text-orange-300 font-semibold mr-1">IF</span>
-                <span className="text-zinc-200">{it.condition}</span>
-              </div>
-              <div className="text-sm mt-1">
-                <span className="text-orange-300 font-semibold mr-1">→</span>
-                <span className="text-zinc-200">{it.consequence}</span>
-              </div>
-              {it.speaker && <div className="text-xs text-zinc-400 mt-1">— {it.speaker}</div>}
-              <div className="mt-2">
-                <QuoteList vid={vid} quotes={it.quotes} />
-              </div>
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-
-      {summary.narrative && <NarrativeFlow narrative={summary.narrative} />}
-
-      {summary.buys && summary.buys.length > 0 && (
-        <Section icon="💰" title="매수" color="green">
-          {summary.buys.map((it, i) => (
-            <ItemCard key={i} accent="green">
-              <ItemHead title={it.ticker} speaker={it.speaker} />
-              <p className="text-sm text-zinc-300 mt-1 mb-2">{it.reason}</p>
-              <QuoteList vid={vid} quotes={it.quotes} />
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-
-      {summary.sells && summary.sells.length > 0 && (
-        <Section icon="🔻" title="매도/손절" color="red">
-          {summary.sells.map((it, i) => (
-            <ItemCard key={i} accent="red">
-              <ItemHead title={it.ticker} speaker={it.speaker} />
-              <p className="text-sm text-zinc-300 mt-1 mb-2">{it.reason}</p>
-              <QuoteList vid={vid} quotes={it.quotes} />
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-
-      {summary.macro_views && summary.macro_views.length > 0 && (
-        <Section icon="📈" title="거시 진단" color="blue">
-          {summary.macro_views.map((it, i) => (
-            <ItemCard key={i} accent="blue">
-              <ItemHead title={it.topic} speaker={it.speaker} />
-              <p className="text-sm text-zinc-300 mt-1 mb-2">{it.view}</p>
-              <QuoteList vid={vid} quotes={it.quotes} />
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-
-      {summary.chart_levels && summary.chart_levels.length > 0 && (
-        <Section icon="📊" title="차트 자리" color="cyan">
-          {summary.chart_levels.map((it, i) => (
-            <ItemCard key={i} accent="cyan">
-              <div className="flex items-baseline gap-2 flex-wrap">
-                <span className="text-base font-bold text-white">{it.ticker}</span>
-                <span className="text-sm text-cyan-300">{it.level}</span>
-                {it.speaker && <span className="text-xs text-zinc-400">— {it.speaker}</span>}
-              </div>
-              <p className="text-sm text-zinc-300 mt-1 mb-2">{it.reason}</p>
-              <QuoteList vid={vid} quotes={it.quotes} />
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-
-      {summary.watchlist && summary.watchlist.length > 0 && (
-        <Section icon="👀" title="봐야 할 것" color="amber">
-          {summary.watchlist.map((it, i) => (
-            <ItemCard key={i} accent="amber">
-              <ItemHead title={it.topic} speaker={it.speaker} />
-              <p className="text-sm text-zinc-300 mt-1 mb-2">{it.reason}</p>
-              <QuoteList vid={vid} quotes={it.quotes} />
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-
-      {summary.lessons && summary.lessons.length > 0 && (
-        <Section icon="🎓" title="학습 포인트" color="pink">
-          {summary.lessons.map((it, i) => (
-            <ItemCard key={i} accent="pink">
-              <div className="flex items-baseline gap-2 flex-wrap mb-1">
-                <span
-                  className={`text-xs font-bold uppercase px-1.5 py-0.5 rounded ${
-                    lessonTypeBadge[it.type] ?? 'bg-zinc-700 text-zinc-300'
-                  }`}
-                >
-                  {it.type}
-                </span>
-                {it.speaker && <span className="text-xs text-zinc-400">— {it.speaker}</span>}
-              </div>
-              <p className="text-sm text-zinc-300 mb-2">{it.lesson}</p>
-              <QuoteList vid={vid} quotes={it.quotes} />
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-
-      {summary.data_points && summary.data_points.length > 0 && (
-        <Section icon="📌" title="통계·숫자" color="zinc">
-          {summary.data_points.map((it, i) => (
-            <ItemCard key={i} accent="zinc">
-              <p className="text-sm text-zinc-100 font-mono mb-2">{it.datum}</p>
-              <QuoteList vid={vid} quotes={it.quotes} />
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-
-      {summary.action_items && summary.action_items.length > 0 && (
-        <Section icon="✅" title="실행 가능" color="teal">
-          {summary.action_items.map((it, i) => (
-            <ItemCard key={i} accent="teal">
-              <div className="flex items-baseline gap-2 flex-wrap">
-                <span className="text-sm text-zinc-100">{it.action}</span>
-                {it.speaker && <span className="text-xs text-zinc-400">— {it.speaker}</span>}
-              </div>
-              <div className="mt-2">
-                <QuoteList vid={vid} quotes={it.quotes} />
-              </div>
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-
-      {summary.terms && summary.terms.length > 0 && (
-        <Section icon="📖" title="용어" color="violet">
-          {summary.terms.map((it, i) => (
-            <ItemCard key={i} accent="violet">
-              <div className="text-base font-bold text-violet-400">{it.term}</div>
-              <p className="text-sm text-zinc-300 mt-1 mb-2">{it.explain}</p>
-              {it.context && <p className="text-xs text-zinc-400">{it.context}</p>}
-              <QuoteList vid={vid} quotes={it.quotes} />
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-    </div>
-  )
-}
-
-// 영상 흐름 — narrative 텍스트를 단계 카드 리스트로.
-// 다양한 화살표(→ ⇒ ➜ ▶ ▷)와 줄바꿈 모두 split 기준.
-function NarrativeFlow({ narrative }: { narrative: string }) {
-  const SPLIT_RE = /\s*(?:→|⇒|➜|▶|▷|->|=>)\s*|\n+/
-  const steps = narrative
-    .split(SPLIT_RE)
-    .map((s) => s.trim())
-    .filter(Boolean)
-
-  return (
-    <Section icon="📜" title="영상 흐름" color="slate">
-      <ol className="space-y-2">
-        {steps.map((step, i) => (
-          <li
-            key={i}
-            className="rounded-lg border border-zinc-800 border-l-[3px] border-l-slate-400 bg-zinc-900/50 p-3 flex gap-3"
-          >
-            <span className="text-xs font-mono text-slate-400 shrink-0 mt-0.5">
-              {String(i + 1).padStart(2, '0')}
-            </span>
-            <span className="text-sm text-zinc-300 leading-relaxed">{step}</span>
-          </li>
-        ))}
-      </ol>
-    </Section>
-  )
-}
-
-function Section({
-  icon, title, color, children,
-}: { icon: string; title: string; color: string; children: React.ReactNode }) {
-  return (
-    <section>
-      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-zinc-800">
-        <span className="text-lg">{icon}</span>
-        <h2 className="text-base font-bold">{title}</h2>
+    {sections.length > 0 && <>
+      <nav aria-label="요약 목차" className="sticky top-0 z-10 mb-8 min-w-0 border-y border-zinc-800 bg-bg/95 backdrop-blur">
+        <div className="flex gap-1 overflow-x-auto py-2">
+          {hasOverview && <a href="#overview" className="reader-jump">핵심 포인트</a>}
+          {sections.map(section => <a key={section.id} href={`#${section.id}`} className="reader-jump">{section.title}</a>)}
+        </div>
+      </nav>
+      <div className="space-y-9">
+        {sections.map(section => <section key={section.id} id={section.id} aria-labelledby={`${section.id}-heading`} className="scroll-mt-24">
+          <div className="mb-2 flex items-baseline gap-2 border-b border-zinc-700 pb-3">
+            <h2 id={`${section.id}-heading`} className="text-lg font-semibold tracking-tight">{section.title}</h2>
+            <span className="text-xs tabular-nums text-zinc-400">{section.items.length}</span>
+          </div>
+          <LimitedList items={section.items} label={section.title} />
+        </section>)}
       </div>
-      <div className="space-y-2">{children}</div>
-    </section>
-  )
+    </>}
+  </div>
 }
 
-const accentBorder: Record<string, string> = {
-  green: 'border-l-emerald-400',
-  red: 'border-l-red-400',
-  amber: 'border-l-amber-400',
-  violet: 'border-l-violet-400',
-  blue: 'border-l-blue-400',
-  cyan: 'border-l-cyan-400',
-  orange: 'border-l-orange-400',
-  pink: 'border-l-pink-400',
-  zinc: 'border-l-zinc-400',
-  teal: 'border-l-teal-400',
-  slate: 'border-l-slate-400',
-}
-
-const lessonTypeBadge: Record<string, string> = {
-  rule: 'bg-blue-500/20 text-blue-300',
-  counter: 'bg-red-500/20 text-red-300',
-  reference: 'bg-violet-500/20 text-violet-300',
-  analogy: 'bg-pink-500/20 text-pink-300',
-}
-
-function ItemCard({ accent, children }: { accent: string; children: React.ReactNode }) {
-  return (
-    <div className={`rounded-lg border border-zinc-800 border-l-[3px] ${accentBorder[accent]} bg-zinc-900/50 p-4`}>
-      {children}
-    </div>
-  )
-}
-
-function ItemHead({ title, speaker }: { title: string; speaker: string | null }) {
-  return (
-    <div className="flex items-baseline gap-2 flex-wrap">
-      <span className="text-base font-bold text-white">{title}</span>
-      {speaker && <span className="text-xs text-zinc-400">— {speaker}</span>}
-    </div>
-  )
+function ReaderItem({ vid, title, body, speaker, quotes, badge, extra }: {
+  vid: string; title: string; body?: string; speaker?: string | null; quotes?: Quote[]; badge?: string; extra?: string
+}) {
+  return <div className="min-w-0">
+    <details className="reader-item">
+      <summary className="min-h-11 cursor-pointer py-1">
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-zinc-100">{title}</span>
+          {badge && <span className="shrink-0 rounded border border-zinc-700 px-1.5 py-0.5 text-xs font-normal text-zinc-300">{badge}</span>}
+          <span aria-hidden="true" className="disclosure-arrow shrink-0 text-zinc-400">⌄</span>
+        </span>
+        {speaker && <span className="block truncate text-xs text-zinc-400">{speaker}</span>}
+        {(body || extra) && <span className="reader-preview mt-1 line-clamp-2 text-sm text-zinc-300">{[body, extra].filter(Boolean).join(' · ')}</span>}
+      </summary>
+      <div className="space-y-3 py-3">
+        <SentenceList text={title} />
+        {speaker && <p className="text-xs text-zinc-400">{speaker}</p>}
+        {body && <SentenceList text={body} />}
+        {extra && <SentenceList text={extra} />}
+      </div>
+    </details>
+    <QuoteList vid={vid} quotes={quotes} />
+  </div>
 }

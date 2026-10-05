@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { supabase, Transcript } from '@/lib/supabase'
 import { SummaryCard } from '@/components/SummaryCard'
 import { getChannelMeta } from '@/lib/channels'
-import { thumbnailUrl, watchUrl } from '@/lib/youtube'
+import { watchUrl } from '@/lib/youtube'
 
 export const revalidate = 3600 // 상세 콘텐츠는 요약 후 거의 불변 — 반복 방문 캐시 적중(60s마다 재생성 방지)
 
@@ -22,62 +22,40 @@ export default async function VideoPage({
   if (!t) {
     return (
       <main className="max-w-3xl mx-auto px-5 py-8">
-        <Link href="/" className="text-sm text-zinc-400 hover:text-zinc-200">
+        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center text-sm text-zinc-400 hover:text-zinc-200">
           ← 홈
         </Link>
-        <p className="text-zinc-500 mt-4">영상을 찾을 수 없어요.</p>
+        <p className="text-zinc-400 mt-4">영상을 찾을 수 없어요.</p>
       </main>
     )
   }
 
   const ch = getChannelMeta(t.channel_slug, t.channel)
-  const s = t.summary
 
   return (
-    <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-      <Link href={`/channel/${t.channel_slug}`} className="text-sm text-zinc-400 hover:text-zinc-200">
+    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      <Link href={`/channel/${t.channel_slug}`} className="inline-flex min-h-11 min-w-11 items-center text-sm text-zinc-400 hover:text-zinc-200">
         ← {ch.name}
       </Link>
 
-      {/* 큰 hq 썸네일이 PC 첫 화면의 절반을 차지해 요약이 아래로 밀렸다 → 작은 썸네일 + 링크 한 줄로 */}
-      <article className="mt-4">
-        <header>
-          <div className="flex items-center gap-2 mb-3 text-xs">
-            <span
-              className="px-2 py-0.5 rounded-md font-semibold"
-              style={{ background: `${ch.hex}cc`, color: '#0a0a0a' }}
-            >
-              {ch.name}
-            </span>
-            <span className="text-zinc-400">{t.published_at}</span>
-            {t.summarized_at && (
-              <span className="text-zinc-400">· {t.summarized_at.slice(0, 10)} 요약</span>
-            )}
+      <article className="mt-5">
+        <header className="border-b border-zinc-800 pb-6">
+          <p className="mb-3 text-xs font-medium tracking-widest text-sky-300">영상 요약</p>
+          <h1 className="text-2xl font-bold leading-snug tracking-tight sm:text-3xl">{t.title}</h1>
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
+            <span className="font-medium text-zinc-200">{ch.name}</span>
+            {t.published_at && <time dateTime={t.published_at}>{t.published_at.slice(0, 10)}</time>}
+            {t.summarized_at && <span>{t.summarized_at.slice(0, 10)} 요약</span>}
+            <a href={t.url || watchUrl(t.vid)} target="_blank" rel="noreferrer"
+              className="inline-flex min-h-11 items-center text-sky-300 hover:underline sm:ml-auto">
+              YouTube 원본 보기 <span aria-hidden="true" className="ml-1">↗</span>
+            </a>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight">{t.title}</h1>
-          {s?.headline && (
-            <p className="mt-3 text-base text-zinc-300 leading-relaxed">{s.headline}</p>
-          )}
         </header>
-
-        <a
-          href={t.url || watchUrl(t.vid)}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-4 flex items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900/50 p-2 pr-4 hover:border-zinc-600"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={thumbnailUrl(t.vid, 'mq')}
-            alt=""
-            className="w-28 aspect-video rounded object-cover shrink-0"
-          />
-          <span className="text-sm font-semibold text-zinc-200">▶ YouTube에서 원본 보기</span>
-        </a>
       </article>
 
       <div className="mt-8">
-        <SummaryCard vid={t.vid} summary={t.summary ?? null} />
+        <SummaryCard vid={t.vid} summary={t.summary ?? null} channel={t.channel} />
       </div>
     </main>
   )
