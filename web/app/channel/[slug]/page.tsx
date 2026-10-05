@@ -26,7 +26,7 @@ export default async function ChannelPage({
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      <Link href="/" className="text-xs text-zinc-500 hover:text-zinc-200">
+      <Link href="/" className="text-sm text-zinc-400 hover:text-zinc-200">
         ← 홈
       </Link>
 
@@ -34,7 +34,7 @@ export default async function ChannelPage({
         <h1 className="text-3xl font-bold tracking-tight" style={{ color: ch.hex }}>
           {ch.name}
         </h1>
-        <p className="text-sm text-zinc-500 mt-1">요약 {totalSummarized}편</p>
+        <p className="text-sm text-zinc-400 mt-1">요약 {totalSummarized}편</p>
       </header>
 
       <InfiniteList mode="channel-summarized" channelSlug={slug} showChannel={false} pageSize={20} />

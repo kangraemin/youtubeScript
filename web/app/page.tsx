@@ -66,52 +66,44 @@ export default async function HomePage() {
   ])
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      <header className="mb-10">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <header className="mb-4">
+        <h1 className="text-xl sm:text-3xl font-bold tracking-tight">
           📺 주식·경제 요약 다이제스트
         </h1>
         {/* 채널 수는 하드코딩하면 채널이 늘 때마다 어긋난다(실제 11개인데 "7개"로 방치됐었다).
             갱신 주기도 revalidate 상수에서 직접 뽑아 문구와 동작이 갈라지지 않게 한다. */}
-        <p className="text-sm text-zinc-500 mt-1">
+        <p className="text-sm text-zinc-400 mt-1">
           {STOCK_ECON_SLUGS.length}개 채널 영상의 매수·매도·관전 포인트를 한 곳에 모아봅니다 ·{' '}
           {revalidate / 3600}시간마다 갱신
         </p>
       </header>
 
-      <section className="mb-12">
-        <h2 className="text-lg font-semibold mb-4 text-zinc-200">채널</h2>
-        {/* 채널 11개 기준. xl:7이면 둘째 줄에 4개만 남아 어색하다 — 6열이면 6+5로 균형이 맞는다. */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+      {/* 채널은 가로 스크롤 칩 한 줄. 예전엔 통계 카드 그리드가 모바일 첫 화면을 통째로 차지해
+          요약이 1.4화면 아래에서야 보였다(2026-10-05 실측, 첫 카드 y=1,222 / 화면 844). */}
+      <nav aria-label="채널" className="-mx-4 sm:mx-0 mb-5 overflow-x-auto">
+        <ul className="flex gap-2 px-4 sm:px-0 sm:flex-wrap w-max sm:w-auto">
           {channelStats.map((s) => {
             const ch = getChannelMeta(s.slug)
             return (
-              <Link
-                key={s.slug}
-                href={`/channel/${s.slug}`}
-                className="group block rounded-xl border border-zinc-800 hover:border-zinc-600 bg-zinc-900/40 p-4 transition-all hover:-translate-y-0.5"
-                style={{ borderTopColor: ch.hex, borderTopWidth: 3 }}
-              >
-                <div className="text-sm font-semibold text-zinc-100 mb-1 group-hover:text-white">
+              <li key={s.slug}>
+                <Link
+                  href={`/channel/${s.slug}`}
+                  title={s.latest_published_at ? `최근 ${s.latest_published_at}` : undefined}
+                  className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-zinc-700 bg-zinc-900/60 px-3 py-1.5 text-sm text-zinc-200 hover:border-zinc-500"
+                >
+                  <span className="h-2 w-2 rounded-full" style={{ background: ch.hex }} />
                   {ch.name}
-                </div>
-                <div className="text-2xl font-bold" style={{ color: ch.hex }}>
-                  {s.count_summarized}
-                </div>
-                <div className="text-[10px] text-zinc-500 mt-0.5">요약</div>
-                {s.latest_published_at && (
-                  <div className="text-[10px] text-zinc-600 mt-1">
-                    최근 {s.latest_published_at}
-                  </div>
-                )}
-              </Link>
+                  <span className="text-xs text-zinc-400">{s.count_summarized}</span>
+                </Link>
+              </li>
             )
           })}
-        </div>
-      </section>
+        </ul>
+      </nav>
 
       <section>
-        <h2 className="text-lg font-semibold text-zinc-200 mb-4">최신 요약</h2>
+        <h2 className="sr-only">최신 요약</h2>
         <SearchableFeed initialItems={initialFeed} />
       </section>
     </main>

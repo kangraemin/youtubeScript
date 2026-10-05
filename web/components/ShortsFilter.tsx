@@ -70,7 +70,7 @@ export function ShortsFilter({ value, onChange }: Props) {
         />
       </span>
       쇼츠 숨기기
-      <span className="text-xs text-zinc-500">3분 미만</span>
+      <span className="text-xs text-zinc-400">3분 미만</span>
     </button>
   )
 }

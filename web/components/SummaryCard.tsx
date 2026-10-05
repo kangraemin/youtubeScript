@@ -6,22 +6,43 @@ type Props = { vid: string; summary: Summary | null }
 export function SummaryCard({ vid, summary }: Props) {
   if (!summary) {
     return (
-      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-center text-zinc-500">
+      <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-6 text-center text-zinc-400">
         아직 요약되지 않았어요. /loop이 처리 중입니다.
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {summary.headline && (
-        <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-sky-400 mb-1">
-            📝 HEADLINE
-          </div>
-          <div className="text-base font-semibold leading-relaxed">{summary.headline}</div>
-        </div>
+    <div className="summary-body space-y-8">
+      {summary.raw_summary && (
+        <section className="rounded-xl border border-sky-500/25 bg-sky-500/5 p-4 sm:p-5">
+          <h2 className="text-sm font-semibold text-sky-300 mb-2">핵심 요약</h2>
+          <p className="text-[15px] text-zinc-100">{summary.raw_summary}</p>
+        </section>
       )}
+
+      {summary.verdicts && summary.verdicts.length > 0 && (
+        <Section icon="⚡" title="결론·시그널" color="orange">
+          {summary.verdicts.map((it, i) => (
+            <ItemCard key={i} accent="orange">
+              <div className="text-sm">
+                <span className="text-orange-300 font-semibold mr-1">IF</span>
+                <span className="text-zinc-200">{it.condition}</span>
+              </div>
+              <div className="text-sm mt-1">
+                <span className="text-orange-300 font-semibold mr-1">→</span>
+                <span className="text-zinc-200">{it.consequence}</span>
+              </div>
+              {it.speaker && <div className="text-xs text-zinc-400 mt-1">— {it.speaker}</div>}
+              <div className="mt-2">
+                <QuoteList vid={vid} quotes={it.quotes} />
+              </div>
+            </ItemCard>
+          ))}
+        </Section>
+      )}
+
+      {summary.narrative && <NarrativeFlow narrative={summary.narrative} />}
 
       {summary.buys && summary.buys.length > 0 && (
         <Section icon="💰" title="매수" color="green">
@@ -47,31 +68,6 @@ export function SummaryCard({ vid, summary }: Props) {
         </Section>
       )}
 
-      {summary.watchlist && summary.watchlist.length > 0 && (
-        <Section icon="👀" title="봐야 할 것" color="amber">
-          {summary.watchlist.map((it, i) => (
-            <ItemCard key={i} accent="amber">
-              <ItemHead title={it.topic} speaker={it.speaker} />
-              <p className="text-sm text-zinc-300 mt-1 mb-2">{it.reason}</p>
-              <QuoteList vid={vid} quotes={it.quotes} />
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-
-      {summary.terms && summary.terms.length > 0 && (
-        <Section icon="📖" title="용어" color="violet">
-          {summary.terms.map((it, i) => (
-            <ItemCard key={i} accent="violet">
-              <div className="text-base font-bold text-violet-400">{it.term}</div>
-              <p className="text-sm text-zinc-300 mt-1 mb-2">{it.explain}</p>
-              {it.context && <p className="text-xs text-zinc-500 italic">{it.context}</p>}
-              <QuoteList vid={vid} quotes={it.quotes} />
-            </ItemCard>
-          ))}
-        </Section>
-      )}
-
       {summary.macro_views && summary.macro_views.length > 0 && (
         <Section icon="📈" title="거시 진단" color="blue">
           {summary.macro_views.map((it, i) => (
@@ -91,7 +87,7 @@ export function SummaryCard({ vid, summary }: Props) {
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="text-base font-bold text-white">{it.ticker}</span>
                 <span className="text-sm text-cyan-300">{it.level}</span>
-                {it.speaker && <span className="text-xs text-zinc-500">— {it.speaker}</span>}
+                {it.speaker && <span className="text-xs text-zinc-400">— {it.speaker}</span>}
               </div>
               <p className="text-sm text-zinc-300 mt-1 mb-2">{it.reason}</p>
               <QuoteList vid={vid} quotes={it.quotes} />
@@ -100,28 +96,17 @@ export function SummaryCard({ vid, summary }: Props) {
         </Section>
       )}
 
-      {summary.verdicts && summary.verdicts.length > 0 && (
-        <Section icon="⚡" title="결론·시그널" color="orange">
-          {summary.verdicts.map((it, i) => (
-            <ItemCard key={i} accent="orange">
-              <div className="text-sm">
-                <span className="text-orange-300 font-semibold mr-1">IF</span>
-                <span className="text-zinc-200">{it.condition}</span>
-              </div>
-              <div className="text-sm mt-1">
-                <span className="text-orange-300 font-semibold mr-1">→</span>
-                <span className="text-zinc-200">{it.consequence}</span>
-              </div>
-              {it.speaker && <div className="text-xs text-zinc-500 mt-1">— {it.speaker}</div>}
-              <div className="mt-2">
-                <QuoteList vid={vid} quotes={it.quotes} />
-              </div>
+      {summary.watchlist && summary.watchlist.length > 0 && (
+        <Section icon="👀" title="봐야 할 것" color="amber">
+          {summary.watchlist.map((it, i) => (
+            <ItemCard key={i} accent="amber">
+              <ItemHead title={it.topic} speaker={it.speaker} />
+              <p className="text-sm text-zinc-300 mt-1 mb-2">{it.reason}</p>
+              <QuoteList vid={vid} quotes={it.quotes} />
             </ItemCard>
           ))}
         </Section>
       )}
-
-      {summary.narrative && <NarrativeFlow narrative={summary.narrative} />}
 
       {summary.lessons && summary.lessons.length > 0 && (
         <Section icon="🎓" title="학습 포인트" color="pink">
@@ -129,13 +114,13 @@ export function SummaryCard({ vid, summary }: Props) {
             <ItemCard key={i} accent="pink">
               <div className="flex items-baseline gap-2 flex-wrap mb-1">
                 <span
-                  className={`text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${
+                  className={`text-xs font-bold uppercase px-1.5 py-0.5 rounded ${
                     lessonTypeBadge[it.type] ?? 'bg-zinc-700 text-zinc-300'
                   }`}
                 >
                   {it.type}
                 </span>
-                {it.speaker && <span className="text-xs text-zinc-500">— {it.speaker}</span>}
+                {it.speaker && <span className="text-xs text-zinc-400">— {it.speaker}</span>}
               </div>
               <p className="text-sm text-zinc-300 mb-2">{it.lesson}</p>
               <QuoteList vid={vid} quotes={it.quotes} />
@@ -161,11 +146,24 @@ export function SummaryCard({ vid, summary }: Props) {
             <ItemCard key={i} accent="teal">
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span className="text-sm text-zinc-100">{it.action}</span>
-                {it.speaker && <span className="text-xs text-zinc-500">— {it.speaker}</span>}
+                {it.speaker && <span className="text-xs text-zinc-400">— {it.speaker}</span>}
               </div>
               <div className="mt-2">
                 <QuoteList vid={vid} quotes={it.quotes} />
               </div>
+            </ItemCard>
+          ))}
+        </Section>
+      )}
+
+      {summary.terms && summary.terms.length > 0 && (
+        <Section icon="📖" title="용어" color="violet">
+          {summary.terms.map((it, i) => (
+            <ItemCard key={i} accent="violet">
+              <div className="text-base font-bold text-violet-400">{it.term}</div>
+              <p className="text-sm text-zinc-300 mt-1 mb-2">{it.explain}</p>
+              {it.context && <p className="text-xs text-zinc-400">{it.context}</p>}
+              <QuoteList vid={vid} quotes={it.quotes} />
             </ItemCard>
           ))}
         </Section>
@@ -191,7 +189,7 @@ function NarrativeFlow({ narrative }: { narrative: string }) {
             key={i}
             className="rounded-lg border border-zinc-800 border-l-[3px] border-l-slate-400 bg-zinc-900/50 p-3 flex gap-3"
           >
-            <span className="text-xs font-mono text-slate-500 shrink-0 mt-0.5">
+            <span className="text-xs font-mono text-slate-400 shrink-0 mt-0.5">
               {String(i + 1).padStart(2, '0')}
             </span>
             <span className="text-sm text-zinc-300 leading-relaxed">{step}</span>
@@ -249,7 +247,7 @@ function ItemHead({ title, speaker }: { title: string; speaker: string | null })
   return (
     <div className="flex items-baseline gap-2 flex-wrap">
       <span className="text-base font-bold text-white">{title}</span>
-      {speaker && <span className="text-xs text-zinc-500">— {speaker}</span>}
+      {speaker && <span className="text-xs text-zinc-400">— {speaker}</span>}
     </div>
   )
 }

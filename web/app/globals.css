@@ -7,3 +7,11 @@ html, body {
   color: #eaeaea;
   font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif;
 }
+
+/* 요약 본문 행간 — 한글 본문 권장 1.6~1.7. Tailwind text-sm은 행간 1.43(20px/14px)을 같이 박아서
+   상세 본문이 빽빽했다(2026-10-05 실측). 유틸리티보다 구체적인 선택자로 덮는다. */
+.summary-body p,
+.summary-body li,
+.summary-body span {
+  line-height: 1.7;
+}

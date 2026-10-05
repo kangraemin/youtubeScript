@@ -209,7 +209,7 @@ export function InfiniteList({
           {hideShorts ? '3분 이상 영상이 없어요. 필터를 꺼보세요.' : '표시할 영상이 없어요.'}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
           {items.map((t) => (
             <VideoCard
               key={t.vid}
@@ -231,7 +231,7 @@ export function InfiniteList({
       )}
 
       {done && items.length > 0 && (
-        <div className="mt-8 text-center text-xs text-zinc-600">
+        <div className="mt-8 text-center text-xs text-zinc-400">
           마지막 페이지 · 총 {items.length}편
         </div>
       )}
