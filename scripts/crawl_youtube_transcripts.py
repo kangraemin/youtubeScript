@@ -22,6 +22,19 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from scripts.channel_config import policy_for, category_of
 
+# 자막 패널 세그먼트 셀렉터 — 신 UI 우선. 구 UI는 body renderer 하위도 이 셀렉터로 잡힌다.
+SEGMENT_SELECTORS = [
+    "transcript-segment-view-model",    # 신 YouTube UI
+    "ytd-transcript-segment-renderer",  # 구 YouTube UI
+]
+PANEL_TIMEOUT_MS = 12_000
+# 연속 실패 N건이면 채널 조기 종료. 런 초반 정상 → 중반부터 전건 실패는 소프트 스로틀 시그니처라
+# 계속 때려도 수집량은 늘지 않고 차단 지속시간과 락 점유만 늘어난다.
+CONSEC_FAIL_LIMIT = 8
+# 런 전체 상한(분). 건당 타임아웃만으론 회차 길이가 유계가 아니라서(실패 139건 × 135초 = 5시간+)
+# 공유 락을 7시간 넘게 쥐고 2시간 cron을 전부 스킵시켰다(2026-10-03).
+DEFAULT_RUN_MINUTES = 90
+
 CHANNELS = [
     {"id": "UCehQiKylaW68H_OtRS36wGQ", "slug": "dulcinea_studio",   "name": "둘시네아",            "tab": "videos"},
     {"id": "UCfpaSruWW3S4dibonKXENjA", "slug": "tzuyang",            "name": "쯔양",               "tab": "videos"},
@@ -60,6 +73,8 @@ def parse_args():
                    help="Output directory (default: rawdata/transcripts)")
     p.add_argument("--no-skip-existing", action="store_true",
                    help="Re-collect even if transcript txt already exists")
+    p.add_argument("--max-minutes", type=int, default=DEFAULT_RUN_MINUTES,
+                   help="런 전체 상한(분). 넘으면 남은 영상은 다음 회차로 (0 = 무제한)")
     p.add_argument("--workers", type=int, default=3,
                    help="병렬 처리 worker 수 (기본: 3)")
     return p.parse_args()
@@ -353,25 +368,19 @@ def get_transcript(page, vid: str) -> list[dict] | None:
         print(f"    [transcript] no transcript button found for {vid}")
         return None
 
-    # 패널 로드 대기 — 신 UI(transcript-segment-view-model) 우선, 구 UI fallback
-    panel_loaded = False
-    matched_sel = None
-    for seg_sel in [
-        "transcript-segment-view-model",           # 신 YouTube UI
-        "ytd-transcript-segment-renderer",          # 구 YouTube UI
-        "ytd-transcript-body-renderer ytd-transcript-segment-renderer",
-    ]:
-        try:
-            page.wait_for_selector(seg_sel, timeout=45000)
-            panel_loaded = True
-            matched_sel = seg_sel
-            break
-        except PlaywrightTimeout:
-            continue
-
-    if not panel_loaded:
+    # 패널 로드 대기 — 셀렉터를 콤마로 묶어 1회만 기다린다. 예전엔 3개를 45초씩 순차 대기해
+    # 소프트 스로틀(런 중반부터 세그먼트가 안 옴) 상태에서 실패 1건이 135초를 태웠다.
+    try:
+        page.wait_for_selector(", ".join(SEGMENT_SELECTORS), timeout=PANEL_TIMEOUT_MS)
+    except PlaywrightTimeout:
         print(f"    [transcript] panel did not load for {vid}")
         return None
+    # 신 UI가 있으면 신 UI 파서, 아니면 구 UI 파서
+    matched_sel = (
+        "transcript-segment-view-model"
+        if page.query_selector("transcript-segment-view-model")
+        else "ytd-transcript-segment-renderer"
+    )
 
     result = []
     if matched_sel == "transcript-segment-view-model":
@@ -424,11 +433,17 @@ def save_list_json(out_dir: str, slug: str, videos: list[dict]):
     path.parent.mkdir(parents=True, exist_ok=True)
     collected_at = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     entries = [{**v, "collected_at": collected_at} for v in videos]
-    path.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+    # 원자적 교체 — upload가 크롤과 독립 스케줄로 돌므로 반쯤 쓴 파일을 읽으면 안 된다
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(entries, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
 
 
-def process_channel(ch, headless, output_dir, max_videos, days, skip_existing):
+def process_channel(ch, headless, output_dir, max_videos, days, skip_existing, deadline=None):
     prefix = f"[{ch['name']}]"
+    if deadline and time.time() >= deadline:
+        print(f"{prefix} 런 상한 도달 — 이번 회차 건너뜀", flush=True)
+        return {"slug": ch["slug"], "ok": 0, "skip": 0, "fail": 0, "stopped": "deadline"}
     api_key = os.environ.get("YOUTUBE_API_KEY") or _load_env_key(".env.local", "YOUTUBE_API_KEY")
     youtube = build("youtube", "v3", developerKey=api_key)
 
@@ -456,6 +471,13 @@ def process_channel(ch, headless, output_dir, max_videos, days, skip_existing):
     ]
     skip = total - len(videos_to_crawl)
 
+    # heavy 채널은 큐가 수백 건이라 스로틀 상태에서 소모 시간이 비례해 커진다 → 회차당 상한
+    cap = policy_for(ch["slug"]).get("crawl_cap", 0)
+    if cap and len(videos_to_crawl) > cap:
+        print(f"{prefix} 큐 cap {cap} 적용: {len(videos_to_crawl)} → {cap}", flush=True)
+        videos_to_crawl = videos_to_crawl[:cap]
+
+    stopped = None
     if videos_to_crawl:
         with sync_playwright() as pw:
             browser = pw.chromium.launch(
@@ -471,20 +493,31 @@ def process_channel(ch, headless, output_dir, max_videos, days, skip_existing):
                 viewport={"width": 1280, "height": 800},
             )
             page = context.new_page()
+            consec_fail = 0
             for i, v in enumerate(videos_to_crawl, 1):
+                if deadline and time.time() >= deadline:
+                    stopped = "deadline"
+                    print(f"{prefix} 런 상한 도달 — {i - 1}/{len(videos_to_crawl)}에서 중단", flush=True)
+                    break
                 segments = get_transcript(page, v["vid"])
                 if segments:
                     save_transcript(output_dir, ch["slug"], v["vid"], v["title"], v["url"], segments)
                     ok += 1
+                    consec_fail = 0
                 else:
                     fail += 1
+                    consec_fail += 1
+                    if consec_fail >= CONSEC_FAIL_LIMIT:
+                        stopped = "circuit"
+                        print(f"{prefix} [서킷브레이커] 연속 실패 {consec_fail}건 — 소프트 스로틀 의심, 채널 조기 종료", flush=True)
+                        break
                 if (ok + fail) % 10 == 0:
                     print(f"{prefix} 진행 {i}/{len(videos_to_crawl)} (ok={ok} skip={skip} fail={fail})", flush=True)
             context.close()
             browser.close()
 
-    print(f"{prefix} 완료: ok={ok} skip={skip} fail={fail}", flush=True)
-    return {"slug": ch["slug"], "ok": ok, "skip": skip, "fail": fail}
+    print(f"{prefix} 완료: ok={ok} skip={skip} fail={fail}" + (f" stopped={stopped}" if stopped else ""), flush=True)
+    return {"slug": ch["slug"], "ok": ok, "skip": skip, "fail": fail, "stopped": stopped}
 
 
 def main():
@@ -492,20 +525,22 @@ def main():
     channels = filter_channels(args.channel)
     skip_existing = not args.no_skip_existing
     workers = min(args.workers, len(channels))
-    print(f"총 {len(channels)}개 채널, {workers} workers로 병렬 실행")
+    deadline = time.time() + args.max_minutes * 60 if args.max_minutes > 0 else None
+    print(f"총 {len(channels)}개 채널, {workers} workers로 병렬 실행 (런 상한 {args.max_minutes or '무제한'}분)")
 
     with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = {
             executor.submit(
                 process_channel, ch, args.headless, args.output_dir,
-                args.max_videos, args.days, skip_existing
+                args.max_videos, args.days, skip_existing, deadline
             ): ch for ch in channels
         }
         for future in as_completed(futures):
             ch = futures[future]
             try:
                 r = future.result()
-                print(f"[완료] {r['slug']}: ok={r['ok']} skip={r['skip']} fail={r['fail']}")
+                print(f"[완료] {r['slug']}: ok={r['ok']} skip={r['skip']} fail={r['fail']}"
+                      + (f" stopped={r['stopped']}" if r.get("stopped") else ""))
             except Exception as e:
                 print(f"[실패] {ch['slug']}: {e}")
 

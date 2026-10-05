@@ -24,7 +24,7 @@ if [ -z "${CRAWL_LOCK_HELD:-}" ]; then
 fi
 
 source .env.local
-.venv/bin/python scripts/crawl_youtube_transcripts.py --headless --workers 3 >> rawdata/transcripts/_cron.log 2>&1
-.venv/bin/python scripts/upload_transcripts.py >> rawdata/transcripts/_cron.log 2>&1
-# 신규 적재분의 duration_sec 채우기 (웹 쇼츠 필터용). NULL인 행만 조회하므로 증분만 처리된다.
-.venv/bin/python scripts/backfill_duration.py >> rawdata/transcripts/_cron.log 2>&1
+# upload·duration 채우기는 scripts/cron_upload.sh가 독립 스케줄(매시 :40)로 돈다.
+# 예전엔 여기서 crawl 다음에 순차 실행했는데, crawl이 스로틀로 7시간+ 끝나지 않자
+# upload가 한 번도 안 돌아 로컬 1,512건이 DB에 0건이었다(2026-10-02).
+.venv/bin/python scripts/crawl_youtube_transcripts.py --headless --workers 3 --max-minutes 90 >> rawdata/transcripts/_cron.log 2>&1

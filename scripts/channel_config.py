@@ -63,13 +63,15 @@ SCREEN_SLUGS = {"jisik_inside", "yonhap_economy"}
 #   시황·뉴스처럼 시의성이 전부인 콘텐츠는 한 달이 지나면 읽히지 않으므로 30일로 끊는다.
 #   교양(culture)은 개별 영상의 수명이 길어 오래된 것도 값이 있어 제한을 두지 않는다.
 #   days(크롤 범위)와는 별개 축이다 — 수집은 하되 요약만 안 할 수 있다.
+# crawl_cap: 크롤 1회차에 시도할 영상 수 상한. 없거나 0 = 무제한.
+#   heavy는 큐가 수백 건(삼프로TV days=60 → 809건)이라 스로틀 상태에서 회차를 끝없이 늘린다.
 CATEGORY_POLICY = {
     "stock_econ":   {"days": 30, "summary": True,  "min_duration_sec": 0,   "summary_days": 30},
     "news":         {"days": 30, "summary": True,  "min_duration_sec": 180, "summary_days": 30},
     "invest_media": {"days": 30, "summary": True,  "min_duration_sec": 180, "summary_days": 30},
     "culture":      {"days": 30, "summary": True,  "min_duration_sec": 180, "summary_days": 0},
     "food":         {"days": 60, "summary": False, "min_duration_sec": 0,   "summary_days": 0},
-    "heavy":        {"days": 60, "summary": False, "min_duration_sec": 0,   "summary_days": 0},  # sampro_tv 등
+    "heavy":        {"days": 60, "summary": False, "min_duration_sec": 0,   "summary_days": 0, "crawl_cap": 30},  # sampro_tv 등
 }
 
 DEFAULT_POLICY = {"days": 30, "summary": False, "min_duration_sec": 0, "summary_days": 0}
