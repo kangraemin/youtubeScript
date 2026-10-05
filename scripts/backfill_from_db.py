@@ -26,7 +26,9 @@ os.environ.setdefault("SUPABASE_SERVICE_KEY", os.environ.get("SUPABASE_SERVICE_R
 sys.path.insert(0, str(_ROOT / "worker"))
 sys.path.insert(0, str(_ROOT / "scripts"))
 from supabase_client import get_client, call_with_retry
-from crawl_youtube_transcripts import get_transcript, save_transcript
+from crawl_youtube_transcripts import (
+    get_transcript, save_transcript, CONSEC_FAIL_LIMIT, DEFAULT_RUN_MINUTES,
+)
 
 
 def fmt_segments(segments: list) -> str:
@@ -41,7 +43,11 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument("--headless", action="store_true")
     p.add_argument("--channel", default="all")
+    # 2026-10-05: 소프트 스로틀 중 수천 건을 끝없이 돌며 .crawl.lock을 3h24m 붙잡아
+    # 2시간 크롤을 두 번 굶겼다. 크롤러와 같은 상한(연속 실패·실행 시간)을 건다.
+    p.add_argument("--max-minutes", type=float, default=DEFAULT_RUN_MINUTES)
     args = p.parse_args()
+    deadline = time.time() + args.max_minutes * 60
 
     db = get_client()
 
@@ -68,6 +74,8 @@ def main():
         print(f"  {ch}: {n}")
 
     ok = fail = 0
+    consec_fail = 0
+    stopped = None
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(
@@ -84,6 +92,10 @@ def main():
         BATCH = []
 
         for i, row in enumerate(rows, 1):
+            if time.time() >= deadline:
+                stopped = "deadline"
+                print(f"  실행 시간 상한 {args.max_minutes:g}분 도달 — [{i - 1}/{len(rows)}]에서 중단", flush=True)
+                break
             vid = row["vid"]
             slug = row["channel_slug"]
 
@@ -96,8 +108,10 @@ def main():
                 if txt_file.exists() and txt_file.stat().st_size > 0:
                     BATCH.append(vid)   # DB엔 본문 안 씀 — has_transcript=true 세팅 대상 vid만
                 ok += 1
+                consec_fail = 0
             else:
                 fail += 1
+                consec_fail += 1
 
             # 50개마다 has_transcript 일괄 세팅 (메타만, 본문 미기록)
             if len(BATCH) >= 50:
@@ -108,7 +122,13 @@ def main():
                 print(f"  [{i}/{len(rows)}] ok={ok} fail={fail} — has_transcript {len(BATCH)}개 세팅", flush=True)
                 BATCH.clear()
 
-        # 나머지 세팅
+            # 연속 실패 = 소프트 스로틀. 계속 두드려봐야 전부 실패하고 락만 붙잡는다.
+            if consec_fail >= CONSEC_FAIL_LIMIT:
+                stopped = "circuit"
+                print(f"  연속 {consec_fail}회 실패 — 스로틀로 보고 [{i}/{len(rows)}]에서 중단", flush=True)
+                break
+
+        # 나머지 세팅 (중단돼도 이미 저장한 건 반영)
         if BATCH:
             try:
                 call_with_retry(lambda: db.table("transcripts").update({"has_transcript": True}).in_("vid", BATCH).execute())
@@ -119,7 +139,7 @@ def main():
         context.close()
         browser.close()
 
-    print(f"\n완료: ok={ok} fail={fail}")
+    print(f"\n완료: ok={ok} fail={fail} stopped={stopped or 'none'}")
 
 
 if __name__ == "__main__":
