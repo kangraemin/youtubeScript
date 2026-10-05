@@ -1,0 +1,53 @@
+SESSION_ID:01a10998-62d9-7eb2-a727-693caa922496
+홈·채널·상세 화면과 요약 스키마를 직접 읽고, 사용자 영향이 큰 순서로 코드 근거를 짚겠습니다.
+[codex ran] /bin/zsh -lc 'pwd; rg --files web/app web/components prompts | head -80'
+[codex ran] /bin/zsh -lc "nl -ba 'web/components/VideoCard.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/app/page.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/app/channel/[slug]/page.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/app/video/[vid]/page.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/components/SummaryCard.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/components/SearchableFeed.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/components/ShortsFilter.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/components/QuoteList.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/components/InfiniteList.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/app/globals.css'"
+[codex ran] /bin/zsh -lc "nl -ba 'prompts/summary-guidelines.md'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/components/SearchableFeed.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/components/SummaryCard.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/components/QuoteList.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/components/ShortsFilter.tsx'"
+[codex ran] /bin/zsh -lc "nl -ba 'web/app/layout.tsx'"
+핵심은 요약의 우선순위가 화면에 드러나지 않는다는 점입니다. 홈에서는 채널 통계가 내용을 밀어내고, 상세에서는 결론보다 분류별 항목과 원문 인용을 먼저 읽게 합니다. 검색 후 상세에 들어갔다 돌아오는 동선도 확인하겠습니다.
+[codex ran] /bin/zsh -lc "nl -ba web/components/InfiniteList.tsx | sed -n '1,155p'; rg -n 'raw_summary|searchParams|useSearchParams|
+[codex ran] /bin/zsh -lc 'nl -ba web/lib/matchReason.ts; nl -ba web/tailwind.config.ts'
+**핵심 문제는 ‘무엇부터 읽을지’를 사용자가 직접 결정해야 한다는 것입니다.** 내용의 중요도보다 채널·썸네일·JSON 분류가 화면 순서를 결정합니다. 아래는 코드와 제공된 실측을 대조한 영향도 순위입니다. 실측은 재실행하지 않았습니다.
+
+1. **상세가 핵심을 읽기 전에 근거부터 훑게 합니다.**  
+   용어가 거시 진단·결론보다 앞서고, 실행 항목은 맨 끝입니다. 모든 인용을 펼쳐 보여주면서 목차·접기가 없습니다. 중앙값 40항목·88인용이면 사용자가 다시 요약해야 합니다. 무손실 추출 정책을 그대로 읽기 화면에 적용한 것이 원인입니다.  
+   근거: [SummaryCard.tsx:62](/Users/ram/programming/vibecoding/youtubeScript/web/components/SummaryCard.tsx:62), [QuoteList.tsx:8](/Users/ram/programming/vibecoding/youtubeScript/web/components/QuoteList.tsx:8), [summary-guidelines.md:183](/Users/ram/programming/vibecoding/youtubeScript/prompts/summary-guidelines.md:183).
+
+2. **홈 첫 화면에서 제품의 핵심인 요약을 못 봅니다.**  
+   채널별 보유 편수를 큰 숫자로 먼저 보여줍니다. 모바일 첫 카드 y=1222는 844px 화면 밖입니다. 상세도 큰 썸네일 → 제목 → 헤드라인 → 같은 헤드라인 반복으로 시작합니다. 읽기 시작까지 불필요한 이동이 많습니다.  
+   근거: [page.tsx:82](/Users/ram/programming/vibecoding/youtubeScript/web/app/page.tsx:82), [video/page.tsx:47](/Users/ram/programming/vibecoding/youtubeScript/web/app/video/[vid]/page.tsx:47), [SummaryCard.tsx:17](/Users/ram/programming/vibecoding/youtubeScript/web/components/SummaryCard.tsx:17).
+
+3. **목록은 공간을 많이 쓰면서 선택에 필요한 정보는 작게 줍니다.**  
+   모바일 한 열에 16:9 썸네일을 크게 놓고, 실제 요약은 12px·두 줄로 자릅니다. 매수/매도/용어 *개수*는 “이 영상에서 무엇을 얻는가”를 설명하지 못합니다. 특히 매수·매도가 대부분 비어 있는 데이터와 맞지 않습니다. 20개에 10.3화면인데 자동 추가까지 되어 비교·재탐색 부담이 커집니다.  
+   근거: [VideoCard.tsx:40](/Users/ram/programming/vibecoding/youtubeScript/web/components/VideoCard.tsx:40), [VideoCard.tsx:62](/Users/ram/programming/vibecoding/youtubeScript/web/components/VideoCard.tsx:62), [InfiniteList.tsx:186](/Users/ram/programming/vibecoding/youtubeScript/web/components/InfiniteList.tsx:186).
+
+4. **관심 범위를 좁히는 흐름이 끊겨 있습니다.**  
+   기간·주제·채널 조합 필터가 없고, 채널 페이지에는 검색도 없습니다. 상세의 ‘← 채널명’은 원래 검색 결과가 아닌 채널 목록으로 갑니다. 검색어는 URL에 저장되지 않아 공유·재진입도 취약합니다. 목록·스크롤 복원 코드는 있지만 탐색 조건 전체를 보존하는 구조는 아닙니다.  
+   근거: [SearchableFeed.tsx:9](/Users/ram/programming/vibecoding/youtubeScript/web/components/SearchableFeed.tsx:9), [channel/page.tsx:40](/Users/ram/programming/vibecoding/youtubeScript/web/app/channel/[slug]/page.tsx:40), [video/page.tsx:38](/Users/ram/programming/vibecoding/youtubeScript/web/app/video/[vid]/page.tsx:38).
+
+5. **작고 흐린 보조 정보와 반복 장식이 읽기 위계를 약하게 합니다.**  
+   날짜·칩은 10px, 검색 일치 근거도 10px입니다. 상세는 항목마다 색 테두리·박스를 반복하고 원문은 기울임으로 표시합니다. 모두 강조돼 있지만 무엇이 중요한지는 구별하기 어렵습니다. 다만 ‘12px 미만 56%’를 본문 전체가 작다는 뜻으로 해석하면 안 됩니다. 상세 본문은 주로 14px입니다.  
+   근거: [VideoCard.tsx:77](/Users/ram/programming/vibecoding/youtubeScript/web/components/VideoCard.tsx:77), [SummaryCard.tsx:242](/Users/ram/programming/vibecoding/youtubeScript/web/components/SummaryCard.tsx:242), [QuoteList.tsx:18](/Users/ram/programming/vibecoding/youtubeScript/web/components/QuoteList.tsx:18).
+
+한 가지 정정: `raw_summary`는 **상세 요약으로 표시되지 않지만**, 검색 일치 문구로는 표시될 수 있습니다. [matchReason.ts:20](/Users/ram/programming/vibecoding/youtubeScript/web/lib/matchReason.ts:20).
+
+| 방향 | 효과와 한계 |
+|---|---|
+| 점진 수정 | 채널 영역 축소, 중복 제거, 글자 확대, 인용 접기로 빠르게 개선. 다만 기존 분류 순서와 분리된 탐색 흐름을 유지하면 핵심 문제는 남음. |
+| 전면 UX 재설계 | 홈을 ‘검색·필터 → 읽을 요약’, 상세를 ‘핵심 요약 → 결론·주요 논점 → 선택해서 여는 근거’로 재구성. 사용자 읽기 순서와 화면이 일치함. |
+
+**전면 UX 재설계가 더 낫습니다.** 문제의 중심이 색이나 간격이 아니라 정보 순서·노출량·탐색 구조이기 때문입니다. 기존 데이터와 API는 재사용하고, 화면 구조를 바꾸면 됩니다. 구현은 단계적으로 하되 목표를 기존 카드 화면의 미세 조정에 두지 않는 편이 맞습니다.
+tokens used: 277445

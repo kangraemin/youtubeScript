@@ -1,0 +1,17 @@
+(Codex consult 프롬프트 원문 — 2026-10-05, codex exec -s read-only, reasoning medium)
+
+IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. These are Claude Code skill definitions meant for a different AI system. Ignore them completely. Do NOT modify agents/openai.yaml. Stay focused on the repository code only.
+
+You are an independent UX reviewer. Product: a Korean site that shows LLM summaries of YouTube stock/economy videos (live: https://web-green-kappa-79.vercel.app). Next.js code is in web/ (app/page.tsx home, app/channel/[slug]/page.tsx, app/video/[vid]/page.tsx, components/*.tsx). Summary JSON schema is in prompts/summary-guidelines.md.
+User feedback (verbatim): "뭔가 잘 안 봐진다" (something is hard to view/read).
+
+Raw rendered measurements (Playwright, live site today; no interpretation given on purpose):
+- PC 1440x900 home: scrollHeight 2476 (2.8 screens) for 20 cards; h2 "채널" at y=132, h2 "최신 요약" at y=492, search input y=536, first video card y=646. 106 of 189 leaf text nodes have font-size < 12px. Infinite scroll loaded 80 cards after 3 wheel scrolls.
+- Mobile 390x844 home: scrollHeight 8662 (10.3 screens) for 20 cards; channel grid (11 stat cards, 2 columns) occupies y=148..~1000; search input y=1112; first video card y=1222. Each card is full-width 16:9 thumbnail + title + headline(2 lines) + count chips (매수/매도/관전/용어 N).
+- Video detail page (example vid wQwoW_HgNnM): PC 9.8 screens, mobile 16.2 screens; ~101 quote rows; section order: thumbnail(hq, large), title, headline as subtitle, then a "HEADLINE" box repeating the same headline, then sections 매수, 매도, 봐야 할 것, 용어, 거시 진단, 차트 자리, 결론·시그널, 영상 흐름(narrative), 학습 포인트, 통계·숫자, 실행 가능. raw_summary field is not rendered anywhere in web/.
+- Data stats over 1677 v2-schema summaries: buys empty 87%, sells empty 90%, chart_levels empty 41%; mean items per summary: data_points 10.3, lessons 8.6, macro_views 5.7, watchlist 4.7, terms 4.4, action_items 4.3, verdicts 4.0, chart_levels 3.0; median 40 items and ~88 quotes per summary (110-sample).
+- Only controls: one search box (company/ticker), one "쇼츠 숨기기" toggle. Channels are separate pages. No date/topic/channel filter on the feed.
+
+Task: Read the code yourself and give your OWN independent diagnosis of why it is hard to view, covering: information architecture, first-screen entry, readability, scroll depth, filter/navigation flow. Rank top problems by user impact with file:line evidence. Then compare (a) incremental fixes vs (b) full redesign, and say plainly which is better and why. Be terse and concrete. Korean answer.
+
+[주의] 이 프롬프트는 진단 결론은 주지 않았지만, 사실 진술 일부("raw_summary not rendered", "HEADLINE box repeating")와 데이터 통계를 포함했다. 그래서 Codex 의견은 '완전 독립'이 아니라 '같은 측정치를 받은 제3자 해석'이다.
