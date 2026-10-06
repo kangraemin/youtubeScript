@@ -81,30 +81,31 @@ export default async function HomePage() {
 
       {/* 채널은 가로 스크롤 칩 한 줄. 예전엔 통계 카드 그리드가 모바일 첫 화면을 통째로 차지해
           요약이 1.4화면 아래에서야 보였다(2026-10-05 실측, 첫 카드 y=1,222 / 화면 844). */}
-      <nav aria-label="채널" className="-mx-4 sm:mx-0 mb-5 overflow-x-auto">
-        <ul className="flex gap-2 px-4 sm:px-0 sm:flex-wrap w-max sm:w-auto">
-          {channelStats.map((s) => {
-            const ch = getChannelMeta(s.slug)
-            return (
-              <li key={s.slug}>
-                <Link
-                  href={`/channel/${s.slug}`}
-                  title={s.latest_published_at ? `최근 ${s.latest_published_at}` : undefined}
-                  className="flex min-h-11 items-center gap-3 whitespace-nowrap rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-zinc-200 hover:border-zinc-600"
-                >
-                  <span>
-                    <span className="block font-medium">{ch.name}</span>
-                    <span className="block text-xs text-zinc-400">
-                      {s.latest_published_at ? `최근 업로드 ${s.latest_published_at.slice(0, 10)}` : '업로드 날짜 없음'}
-                    </span>
-                  </span>
-                  <span className="text-xs tabular-nums text-zinc-400">{s.count_summarized}편</span>
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
+      {/* 2026-10-07: 칩이 2줄(이름+최근 업로드)로 커서 모바일 첫 화면에 2개만 화면 폭을 꽉 채웠고,
+          스크롤 단서가 없어 "채널이 2개뿐"으로 보였다. 칩을 한 줄로 줄이고 오른쪽에 페이드를 둬
+          뒤에 더 있다는 걸 보이게 한다. 최근 업로드 날짜는 title(툴팁)로만 남긴다. */}
+      <div className="relative -mx-4 sm:mx-0 mb-5">
+        <nav aria-label={`채널 ${channelStats.length}개`} className="overflow-x-auto">
+          <ul className="flex gap-2 px-4 sm:px-0 sm:flex-wrap w-max sm:w-auto">
+            {channelStats.map((s) => {
+              const ch = getChannelMeta(s.slug)
+              return (
+                <li key={s.slug}>
+                  <Link
+                    href={`/channel/${s.slug}`}
+                    title={s.latest_published_at ? `최근 업로드 ${s.latest_published_at.slice(0, 10)}` : undefined}
+                    className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full border border-zinc-800 bg-zinc-900/60 px-3.5 text-sm text-zinc-200 hover:border-zinc-600"
+                  >
+                    <span className="font-medium">{ch.name}</span>
+                    <span className="text-xs tabular-nums text-zinc-400">{s.count_summarized}</span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </nav>
+        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-bg to-transparent sm:hidden" />
+      </div>
 
       <section>
         <h2 className="sr-only">최신 요약</h2>
