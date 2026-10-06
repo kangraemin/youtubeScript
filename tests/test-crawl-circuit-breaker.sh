@@ -54,6 +54,8 @@ class _Page:
     def wait_for_timeout(self, *a, **k): pass
     def wait_for_load_state(self, *a, **k): pass
     def evaluate(self, *a, **k): return None
+    def on(self, *a, **k): pass               # timedtext fallback 리스너
+    def remove_listener(self, *a, **k): pass
     def query_selector(self, sel): return _Btn()
     def query_selector_all(self, sel): return [_Btn()]
     def wait_for_selector(self, sel, timeout=None, **k):

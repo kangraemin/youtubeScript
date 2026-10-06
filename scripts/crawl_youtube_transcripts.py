@@ -269,7 +269,115 @@ def dedup_segments(segments: list[dict]) -> list[dict]:
     return segments
 
 
+TIMEDTEXT_WAIT_TICKS = 30  # 0.5s × 30 = 최대 15초 (광고 감기 + CC 요청 왕복)
+
+# 반환: "ad"(광고 감는 중) / "cc"(CC를 방금 켬) / "wait"
+_PLAYER_NUDGE_JS = """(ccClicked) => {
+  const player = document.querySelector('#movie_player');
+  const v = document.querySelector('video');
+  if (player && player.classList.contains('ad-showing')) {
+    const skip = document.querySelector('.ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern');
+    if (skip) skip.click();
+    if (v && isFinite(v.duration) && v.duration > 0) v.currentTime = v.duration;
+    return 'ad';
+  }
+  const cc = document.querySelector('.ytp-subtitles-button');
+  if (!ccClicked && cc && cc.getAttribute('aria-pressed') === 'false') { cc.click(); return 'cc'; }
+  return 'wait';
+}"""
+
+
+def _fmt_ts(sec: float) -> str:
+    sec = int(sec)
+    h, rem = divmod(sec, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
+def segments_from_json3(data: dict, chunk_sec: float = 5.0) -> list[dict]:
+    """플레이어 timedtext(fmt=json3) 응답 → 패널과 같은 {timestamp, text} 세그먼트.
+
+    ASR 자막은 단어 단위 이벤트라 그대로 쓰면 줄 수가 패널의 3배가 된다.
+    chunk_sec 단위로 묶어 패널 세그먼트와 비슷한 밀도로 맞춘다.
+    """
+    out: list[dict] = []
+    cur_start = None
+    buf: list[str] = []
+    for ev in (data or {}).get("events", []):
+        segs = ev.get("segs")
+        if not segs:
+            continue
+        text = "".join(sg.get("utf8", "") for sg in segs).replace("\n", " ").strip()
+        if not text:
+            continue
+        start = ev.get("tStartMs", 0) / 1000
+        if cur_start is None:
+            cur_start = start
+        elif start - cur_start >= chunk_sec:
+            out.append({"timestamp": _fmt_ts(cur_start), "text": " ".join(buf)})
+            cur_start, buf = start, []
+        buf.append(text)
+    if buf:
+        out.append({"timestamp": _fmt_ts(cur_start), "text": " ".join(buf)})
+    return out
+
+
 def get_transcript(page, vid: str) -> list[dict] | None:
+    """스크립트 패널로 수집하고, 패널이 실패하면 플레이어 timedtext 응답으로 대체한다.
+
+    2026-10-06 실측: 소프트 스로틀 때 막히는 건 패널의 youtubei/v1/get_transcript
+    (400 FAILED_PRECONDITION)뿐이고, 패널을 여는 순간 플레이어가 부르는
+    /api/timedtext(fmt=json3)는 200으로 전체 자막을 준다. 직접 API를 치는 게 아니라
+    페이지가 스스로 받은 응답을 엿듣는 것이라 별도 요청이 늘지 않는다.
+    광고 자막도 같은 경로로 오므로 v= 가 이 영상인 응답만 쓴다.
+    """
+    captured: dict = {}
+
+    def on_response(resp):
+        url = resp.url
+        if "/api/timedtext" not in url:
+            return
+        try:
+            from urllib.parse import urlparse, parse_qs
+            qs = parse_qs(urlparse(url).query)
+            if qs.get("v", [None])[0] != vid or qs.get("fmt", [None])[0] != "json3":
+                return
+            data = resp.json()
+            if any(ev.get("segs") for ev in data.get("events", [])):
+                captured["json3"] = data
+        except Exception:
+            pass
+
+    page.on("response", on_response)
+    try:
+        result = _get_transcript_panel(page, vid)
+        if result:
+            return result
+        # 플레이어는 (1) 본편이 재생 중이고 (2) 자막(CC)이 켜져 있을 때만 본편 timedtext를 받는다.
+        # 광고가 돌면 광고 자막만 오고, CC가 꺼진 영상은 아예 요청이 없다(실측).
+        # 광고는 끝으로 감고, 본편이 나오면 CC를 한 번 켜서 요청을 유도한다.
+        cc_clicked = False
+        for _ in range(TIMEDTEXT_WAIT_TICKS):
+            if "json3" in captured:
+                break
+            try:
+                state = page.evaluate(_PLAYER_NUDGE_JS, cc_clicked)
+                if state == "cc":
+                    cc_clicked = True
+            except Exception:
+                pass
+            time.sleep(0.5)
+        if "json3" in captured:
+            segs = dedup_segments(segments_from_json3(captured["json3"]))
+            if segs:
+                print(f"    [transcript] fallback via timedtext: {len(segs)} segments")
+                return segs
+        return None
+    finally:
+        page.remove_listener("response", on_response)
+
+
+def _get_transcript_panel(page, vid: str) -> list[dict] | None:
     """Open video, click transcript button, extract segments.
 
     Selector strategy (confirmed via live DOM inspection 2026-05):
