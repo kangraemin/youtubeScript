@@ -14,7 +14,7 @@ export function VideoCard({ t, showChannel = true, searchQuery }: Props) {
   const ch = getChannelMeta(t.channel_slug, t.channel)
   const s = t.summary
   // 검색의 전체 요약과 브라우즈의 경량 응답을 모두 표시해야 한다.
-  const headline = s?.headline ?? t.headline ?? null
+  const headline = (s?.schema === 'v3' ? s.tldr : s?.headline) ?? t.headline ?? null
   const hasMeta = !!s || headline != null || t.n_buys != null
   const reasons = searchQuery ? getMatchReasons(t, searchQuery) : []
 
@@ -59,9 +59,9 @@ export function VideoCard({ t, showChannel = true, searchQuery }: Props) {
           </div>
         )}
         <div className="flex flex-wrap gap-1 empty:hidden mb-2" aria-label="포지션 태그">
-          <CountChip label="매수" count={s?.buys?.length ?? t.n_buys} tone="buy" />
-          <CountChip label="매도" count={s?.sells?.length ?? t.n_sells} tone="sell" />
-          <CountChip label="관전" count={s?.watchlist?.length ?? t.n_watch} />
+          <CountChip label="매수" count={(s?.schema === 'v3' ? s.positions?.filter(p => ['buy', 'add', 'plan_buy'].includes(p.action)).length : s?.buys?.length) ?? t.n_buys} tone="buy" />
+          <CountChip label="매도" count={(s?.schema === 'v3' ? s.positions?.filter(p => ['sell', 'reduce', 'plan_sell'].includes(p.action)).length : s?.sells?.length) ?? t.n_sells} tone="sell" />
+          <CountChip label="관전" count={(s?.schema === 'v3' ? s.scenarios?.length : s?.watchlist?.length) ?? t.n_watch} />
           <CountChip label="용어" count={s?.terms?.length ?? t.n_terms} />
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-zinc-400">

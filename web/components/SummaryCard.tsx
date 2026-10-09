@@ -1,3 +1,4 @@
+import { SummaryV3Card } from './SummaryV3Card'
 import type { ReactNode } from 'react'
 import type { Quote, Summary } from '@/lib/supabase'
 import { ReaderNav } from './reader/ReaderNav'
@@ -10,6 +11,8 @@ type ReaderSection = { id: string; title: string; items: ReactNode[] }
 
 export function SummaryCard({ vid, summary, channel }: Props) {
   if (!summary) return <p className="rounded-xl border border-zinc-800 p-6 text-sm text-zinc-400">아직 요약되지 않았어요.</p>
+
+  if (summary.schema === 'v3') return <SummaryV3Card vid={vid} summary={summary} />
 
   const row = (title: string, body?: string, speaker?: string | null, quotes?: Quote[], badge?: string, extra?: string, signal = false) => (
     <ReaderItem vid={vid} title={title} body={body} speaker={speaker} quotes={quotes} badge={badge} extra={extra} signal={signal} />

@@ -27,7 +27,7 @@ returns jsonb language sql immutable as $fn$
   select coalesce(jsonb_object_agg(kv.key,
     case when jsonb_typeof(kv.value) = 'array' then (
       select coalesce(jsonb_agg(
-        case when jsonb_typeof(e) = 'object' then e - 'quotes' else e end
+        case when jsonb_typeof(e) = 'object' then e - 'quotes' - 'quote' else e end
       ), '[]'::jsonb)
       from jsonb_array_elements(kv.value) e
     ) else kv.value end

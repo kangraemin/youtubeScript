@@ -11,13 +11,24 @@ export function getMatchReasons(t: Transcript, qRaw: string): MatchReason[] {
   const s = t.summary
   const candidates: { label: string; text: string }[] = []
   if (t.title) candidates.push({ label: '제목 일치', text: t.title })
-  if (s?.headline) candidates.push({ label: '헤드라인', text: s.headline })
-  for (const b of s?.buys ?? []) candidates.push({ label: '매수 코멘트', text: `${b.ticker} — ${b.reason}` })
-  for (const b of s?.sells ?? []) candidates.push({ label: '매도 코멘트', text: `${b.ticker} — ${b.reason}` })
-  for (const w of s?.watchlist ?? []) candidates.push({ label: '관전 포인트', text: `${w.topic} — ${w.reason}` })
-  for (const tm of s?.terms ?? []) candidates.push({ label: '용어 설명', text: `${tm.term} — ${tm.explain}` })
-  if (s?.narrative) candidates.push({ label: '내러티브', text: s.narrative })
-  if (s?.raw_summary) candidates.push({ label: '요약', text: s.raw_summary })
+  if (s?.schema === 'v3') {
+    if (s.tldr) candidates.push({ label: '핵심 요약', text: s.tldr })
+    for (const point of s.key_points ?? []) {
+      candidates.push({ label: '핵심 포인트', text: point.point })
+      if (point.detail) candidates.push({ label: '상세 설명', text: point.detail })
+    }
+    for (const position of s.positions ?? []) candidates.push({ label: '포지션', text: position.asset })
+    for (const term of s.terms ?? []) candidates.push({ label: '용어 설명', text: `${term.term} — ${term.explain}` })
+    for (const takeaway of s.takeaways ?? []) candidates.push({ label: '학습 포인트', text: takeaway.text })
+  } else {
+    if (s?.headline) candidates.push({ label: '헤드라인', text: s.headline })
+    for (const b of s?.buys ?? []) candidates.push({ label: '매수 코멘트', text: `${b.ticker} — ${b.reason}` })
+    for (const b of s?.sells ?? []) candidates.push({ label: '매도 코멘트', text: `${b.ticker} — ${b.reason}` })
+    for (const w of s?.watchlist ?? []) candidates.push({ label: '관전 포인트', text: `${w.topic} — ${w.reason}` })
+    for (const tm of s?.terms ?? []) candidates.push({ label: '용어 설명', text: `${tm.term} — ${tm.explain}` })
+    if (s?.narrative) candidates.push({ label: '내러티브', text: s.narrative })
+    if (s?.raw_summary) candidates.push({ label: '요약', text: s.raw_summary })
+  }
 
   const out: MatchReason[] = []
   for (const c of candidates) {

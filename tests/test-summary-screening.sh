@@ -1,6 +1,6 @@
 #!/bin/bash
 # tests/test-summary-screening.sh
-# jisik_inside·yonhap_economy 요약 스크리닝(screened_out) 검증
+# jisik_inside·yonhap_economy·moneycomics 요약 스크리닝(screened_out) 검증
 set -e
 cd "$(dirname "$0")/.."
 PASS=0; FAIL=0
@@ -12,11 +12,11 @@ from worker.supabase_client import get_client
 db=get_client()
 print('false count', db.table('transcripts').select('vid',count='exact',head=True).eq('screened_out',False).execute().count)\""
 
-# TC-2 (happy): SCREEN_SLUGS = jisik_inside·yonhap_economy (그 외 미포함)
+# TC-2 (happy): SCREEN_SLUGS = jisik_inside·yonhap_economy·moneycomics(콩트 섞임, 2026-10-09 추가)
 chk "TC-2 SCREEN_SLUGS 정의" ".venv/bin/python -c \"
 from scripts.channel_config import SCREEN_SLUGS
-assert SCREEN_SLUGS=={'jisik_inside','yonhap_economy'}, SCREEN_SLUGS
-assert 'shukaworld' not in SCREEN_SLUGS and 'moneycomics' not in SCREEN_SLUGS
+assert SCREEN_SLUGS=={'jisik_inside','yonhap_economy','moneycomics'}, SCREEN_SLUGS
+assert 'shukaworld' not in SCREEN_SLUGS
 print('SCREEN_SLUGS', SCREEN_SLUGS)\""
 
 # TC-3 (happy): get_next 큐 SQL이 screened_out=false 포함
@@ -47,7 +47,7 @@ PY"
 chk "TC-5 비대상 채널 보존" ".venv/bin/python -c \"
 from scripts.channel_config import SCREEN_SLUGS, SUMMARY_SLUGS
 non=[s for s in SUMMARY_SLUGS if s not in SCREEN_SLUGS]
-assert 'shukaworld' in non and 'moneycomics' in non and 'developmong' in non
+assert 'shukaworld' in non and 'developmong' in non
 print('스크리닝 비대상', non)\""
 
 # TC-6 (happy): summarize-next.md에 스크리닝 스텝 + screen_out.py 존재

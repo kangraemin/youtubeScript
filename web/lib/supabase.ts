@@ -72,7 +72,8 @@ export type ActionItem = {
   quotes: Quote[]
 }
 
-export type Summary = {
+export type SummaryV2 = {
+  schema?: never
   buys?: BuySell[]
   sells?: BuySell[]
   watchlist?: WatchItem[]
@@ -87,6 +88,33 @@ export type Summary = {
   headline?: string
   raw_summary?: string
 }
+
+export type SummaryV3 = {
+  schema: 'v3'
+  content_type: string
+  tldr: string
+  watch_guide: { verdict: 'skip' | 'skim' | 'watch'; why: string }
+  key_points?: { id: string; point: string; detail?: string; ts?: string; quote?: string }[]
+  positions?: {
+    asset: string
+    action: 'buy' | 'sell' | 'add' | 'reduce' | 'hold' | 'plan_buy' | 'plan_sell'
+    when?: string
+    condition?: string
+    detail?: string
+    speaker?: string | null
+    ts?: string
+    quote: string
+  }[]
+  scenarios?: { if: string; then: string; ts?: string }[]
+  numbers?: { fact: string; ts?: string }[]
+  terms?: Term[]
+  takeaways?: { type: 'rule' | 'counter' | 'reference' | 'analogy'; text: string; ts?: string }[]
+  chapters?: { ts: string; title: string }[]
+  entities?: string[]
+  open_questions?: string[]
+}
+
+export type Summary = SummaryV2 | SummaryV3
 
 export type Transcript = {
   vid: string

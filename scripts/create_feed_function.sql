@@ -8,6 +8,17 @@
 --   duration_sec IS NULL(아직 백필 안 된 행)과 -1(삭제·비공개로 조회 불가)은
 --   길이를 알 수 없으므로 필터가 켜져 있으면 제외한다.
 
+-- v3 요약(schema='v3', 2026-10-09~)은 headline 대신 tldr, buys/sells 대신 positions[].action,
+-- watchlist 대신 scenarios를 쓴다. v2 키는 v3에 없으므로 두 쪽을 더해도 이중 계산되지 않는다.
+create or replace function public.count_positions(s jsonb, actions text[])
+returns int language sql immutable as $fn$
+  select count(*)::int
+  from jsonb_array_elements(case when jsonb_typeof(s->'positions') = 'array' then s->'positions' else '[]'::jsonb end) p
+  where p->>'action' = any(actions)
+$fn$;
+
+grant execute on function public.count_positions(jsonb, text[]) to anon, authenticated;
+
 drop function if exists public.feed_summaries(text, int, int);
 drop function if exists public.feed_summaries(text, int, int, int);
 
@@ -36,10 +47,10 @@ stable
 as $$
   select t.vid, t.channel, t.channel_slug, t.title, t.published_at, t.summarized_at,
          t.duration_sec,
-         t.summary->>'headline' as headline,
-         coalesce(jsonb_array_length(t.summary->'buys'), 0) as n_buys,
-         coalesce(jsonb_array_length(t.summary->'sells'), 0) as n_sells,
-         coalesce(jsonb_array_length(t.summary->'watchlist'), 0) as n_watch,
+         coalesce(t.summary->>'headline', t.summary->>'tldr') as headline,
+         coalesce(jsonb_array_length(t.summary->'buys'), 0) + public.count_positions(t.summary, array['buy','add','plan_buy']) as n_buys,
+         coalesce(jsonb_array_length(t.summary->'sells'), 0) + public.count_positions(t.summary, array['sell','reduce','plan_sell']) as n_sells,
+         coalesce(jsonb_array_length(t.summary->'watchlist'), 0) + coalesce(jsonb_array_length(t.summary->'scenarios'), 0) as n_watch,
          coalesce(jsonb_array_length(t.summary->'terms'), 0) as n_terms
   from public.transcripts t
   where t.summary is not null

@@ -1,17 +1,23 @@
 export const meta = {
   name: 'summarize-batch',
   description: '밀린 유튜브 주식·경제 요약을 최근순으로 다중 에이전트 병렬 처리',
-  whenToUse: '요약 대기열(transcripts.summary IS NULL)이 쌓였을 때. args: {fanout, perAgent, rounds}',
+  whenToUse: '요약 대기열(transcripts.summary IS NULL)이 쌓였을 때. args: {fanout, perAgent, rounds, queue}',
   phases: [
-    { title: 'Summarize', detail: '에이전트별 N건씩 claim→전수 Read→13섹션 JSON→저장' },
+    { title: 'Summarize', detail: '에이전트별 N건씩 claim→전수 Read→v3 JSON→검증·저장' },
   ],
 }
 
 const ROOT = '/Users/ram/programming/vibecoding/youtubeScript'
 
-const FANOUT = args?.fanout ?? 12      // 라운드당 동시 에이전트 수
+const MAX_FANOUT = args?.fanout ?? 12  // 라운드당 동시 에이전트 수 상한
 const PER_AGENT = args?.perAgent ?? 4  // 에이전트 1명이 처리할 영상 수
 const ROUNDS = args?.rounds ?? 4       // 라운드 반복 횟수
+
+// queue(대기열 편수)를 주면 에이전트 수를 대기열에 맞춰 줄인다.
+// fanout을 8로 고정했을 때 1편짜리 큐에도 에이전트 8명이 떠서 7명이 빈 claim만 하고
+// 배치당 45만~70만 토큰을 썼다(2026-10-07~09 실측). 남는 에이전트도 가이드라인 Read 비용은 낸다.
+const QUEUE = Number.isFinite(args?.queue) ? args.queue : null
+const FANOUT = QUEUE === null ? MAX_FANOUT : Math.max(1, Math.min(MAX_FANOUT, Math.ceil(QUEUE / PER_AGENT)))
 
 const RESULT_SCHEMA = {
   type: 'object',
@@ -31,7 +37,7 @@ const AGENT_PROMPT = `당신은 유튜브 주식·경제 transcript 요약 작�
 요약 범위는 채널 정책이 정한다(경제 30일 / 교양 제한없음) — 별도 환경변수를 붙이지 마라.
 
 0. 최초 1회만: ${ROOT}/prompts/summary-guidelines.md 를 Read 한다.
-   (출력 JSON 스키마 13섹션 · quotes verbatim 규칙 · 추출 규칙의 정본이다.)
+   (출력 JSON 스키마 v3 · quote verbatim 규칙 · 분량 예산의 정본이다.)
 
 각 회차:
 
@@ -41,10 +47,12 @@ const AGENT_PROMPT = `당신은 유튜브 주식·경제 transcript 요약 작�
    - {"empty": true} 이면 즉시 중단하고 지금까지의 결과를 반환한다 (empty=true로 보고).
    - 정상이면 vid / channel_slug / title / transcript_path / transcript_lines / chunk_size / read_chunks 를 얻는다.
 
-2. 스크리닝 (channel_slug가 jisik_inside 또는 yonhap_economy 일 때만):
+2. 스크리닝 (channel_slug가 jisik_inside·yonhap_economy·moneycomics 일 때만 — scripts/channel_config.py SCREEN_SLUGS):
    제목 + transcript 첫 청크만 보고 주식·경제 요약 가치를 판정한다.
    - 유지: 종목/매크로/경제정책/투자전략/시장분석 + 구체적 인사이트가 있는 영상
    - 제외: 일반 자기계발·인물 인생사·건강·군사·연예·단순 시황 반복중계·기관 원본 브리핑 등
+   - 제외: 콩트·상황극·직장 개그·짧은 밈 클립 — 등장인물이 연기하는 장면 위주이고 종목·시장·경제 정보가 없는 영상
+     (예: 「대표랑 외모로 싸우는 직원」「요즘 수상한 녀석들」)
    제외 판정이면
    cd ${ROOT} && source .env.local && .venv/bin/python scripts/screen_out.py <vid> "<사유>"
    를 실행하고 이 영상은 요약하지 않는다. screened 카운트를 1 올리고 다음 회차로 간다.
@@ -54,15 +62,19 @@ const AGENT_PROMPT = `당신은 유튜브 주식·경제 transcript 요약 작�
    i번째: offset = i * chunk_size + 1, limit = chunk_size.
    라이브 영상은 1,500~3,000줄까지 간다. 마지막 청크까지 읽지 않은 상태로 JSON을 만들지 않는다.
 
-4. 가이드라인의 13섹션 JSON을 만든다.
-   - 모든 청크에서 발화 인용을 골고루 추출한다. 핵심 매매 발언은 후반부에 몰려 있을 수 있다.
-   - quotes는 transcript 원문 발화 그대로 + 라인 앞 타임스탬프 그대로.
+4. 가이드라인의 v3 JSON을 만든다 ("schema": "v3" 필수).
+   - 결론과 근거를 2분 안에 읽히게 압축한다. 한 사실은 한 곳에만 쓴다.
+   - quote는 transcript 원문 발화 그대로(한 줄 안에서, 150자 이내), ts는 라인 앞 타임스탬프 그대로.
+   - chapters 마지막 ts가 영상 길이의 85% 이후여야 한다 — 후반부까지 읽었다는 증거다.
    - "_model": "claude-opus-5" 를 포함한다.
 
 5. 저장:
    Write 도구로 JSON을 /tmp/summary_<vid>.json 에 쓴 뒤
    cd ${ROOT} && source .env.local && cat /tmp/summary_<vid>.json | .venv/bin/python scripts/save_summary.py <vid>
-   "saved: <vid>" 출력을 확인한다. 저장에 실패하면 done 카운트를 올리지 않는다.
+   "saved: <vid>" 출력을 확인한다.
+   save_summary.py는 v3 규칙(필수 필드·quote 원문 존재·분량 예산·quote 중복·후반부 커버리지)을 기계 검증한다.
+   "v3 검증 실패"가 나오면 stderr의 항목을 고쳐 다시 Write → 저장한다(최대 2회 재시도).
+   그래도 실패하면 done 카운트를 올리지 않는다.
 
 반환값: done(저장 성공 건수), screened(스크린아웃 건수), empty(큐가 비었으면 true), titles(처리한 제목 목록).
 사용자에게 말을 거는 대신 반환값만 정확히 채운다.`
@@ -93,7 +105,7 @@ for (let r = 0; r < ROUNDS; r++) {
   for (const x of ok) if (Array.isArray(x.titles)) allTitles.push(...x.titles)
 
   log(
-    `라운드 ${r + 1}/${ROUNDS}: 요약 +${roundDone} (누적 ${totalDone}), ` +
+    `라운드 ${r + 1}/${ROUNDS} (에이전트 ${FANOUT}명): 요약 +${roundDone} (누적 ${totalDone}), ` +
     `스크린아웃 +${roundScreened} (누적 ${totalScreened}), 에이전트 ${ok.length}/${FANOUT} 응답`
   )
 

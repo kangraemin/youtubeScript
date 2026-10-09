@@ -53,7 +53,8 @@ SUMMARY_SLUGS = STOCK_ECON_SLUGS + NEWS_SLUGS + INVEST_MEDIA_SLUGS + CULTURE_SLU
 
 # 요약 전 LLM 관련성 스크리닝을 적용할 채널 (비경제 콘텐츠가 섞인 채널만).
 # 워커가 제목+앞부분으로 주식·경제 요약 가치를 판정해, 가치 없으면 screened_out 처리한다.
-SCREEN_SLUGS = {"jisik_inside", "yonhap_economy"}
+# moneycomics: 콩트·상황극(「대표랑 외모로 싸우는 직원」 등)이 섞여 요약 피드에 노출됐다(2026-10-08).
+SCREEN_SLUGS = {"jisik_inside", "yonhap_economy", "moneycomics"}
 
 
 # === 카테고리 정책 ===
