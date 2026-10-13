@@ -52,7 +52,7 @@ export function InfiniteList({
 
   // 상세→뒤로 시 재fetch 방지: items+done+scroll을 sessionStorage에 보존.
   // 쇼츠 필터가 키에 들어가야 필터별 목록이 서로 섞이지 않는다.
-  const storageKey = `il:points-v2:${mode}:${channelSlug ?? ''}:${searchQuery ?? ''}:${hideShorts ? 'nosh' : 'all'}`
+  const storageKey = `il:reading-v3:${mode}:${channelSlug ?? ''}:${searchQuery ?? ''}:${hideShorts ? 'nosh' : 'all'}`
 
   const loadMore = useCallback(async () => {
     if (inFlight.current || done) return

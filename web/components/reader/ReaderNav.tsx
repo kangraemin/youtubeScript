@@ -23,6 +23,8 @@ export function ReaderNav({
     const schedule = () => {
       if (!frame) frame = requestAnimationFrame(update)
     }
+    const initialTarget = document.getElementById(window.location.hash.slice(1))
+    initialTarget?.scrollIntoView({ block: 'start' })
     update()
     window.addEventListener('scroll', schedule, { passive: true })
     window.addEventListener('resize', schedule)
@@ -44,6 +46,7 @@ export function ReaderNav({
           value={current}
           onChange={(event) => {
             window.location.hash = event.target.value
+            document.getElementById(event.target.value)?.scrollIntoView({ block: 'start' })
             setCurrent(event.target.value)
           }}
         >
