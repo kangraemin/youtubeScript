@@ -1677,9 +1677,6 @@ details[open] > summary > .disclosure-arrow {
 }
 
 /* 섹션의 위치와 수치를 훑어볼 수 있는 압축된 정보 계층. */
-.reader-nav-select {
-  display: none;
-}
 .reader-sections {
   gap: 28px;
   margin-top: 22px;
@@ -1760,34 +1757,6 @@ details[open] > summary > .disclosure-arrow {
   margin-top: 8px;
 }
 @media (max-width: 640px) {
-  .reader-nav-track {
-    display: none;
-  }
-  .reader-nav-select {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 8px 14px;
-  }
-  .reader-nav-select > span {
-    font-size: 12px;
-    color: #3c5443;
-    font-weight: 700;
-    white-space: nowrap;
-  }
-  .reader-nav-select select {
-    min-width: 0;
-    width: 62%;
-    min-height: 42px;
-    font-size: 14px;
-    font-weight: 750;
-    color: #244c33;
-    background: white;
-    border: 1px solid #abc0ad;
-    border-radius: 7px;
-    padding: 8px;
-  }
   .reader-sections {
     gap: 25px;
     margin-top: 20px;
@@ -1821,4 +1790,14 @@ details[open] > summary > .disclosure-arrow {
   .study-points {
     gap: 10px;
   }
+}
+
+/* 목차는 숨기지 않고 모든 항목을 바로 누를 수 있게 노출한다. */
+.reader-nav-track { flex-wrap: wrap; overflow: visible; gap: 3px 5px; }
+.reader-nav { padding: 6px 8px; }
+.reader-jump { min-height: 36px; padding: 0 11px; font-size: 13px; }
+.reader-section, #overview, .study-topic { scroll-margin-top: var(--reader-nav-offset, 150px); }
+@media (max-width: 640px) {
+  .reader-jump { min-height: 34px; padding: 0 9px; font-size: 12px; }
+  .reader-nav { margin-inline: -4px; padding: 6px 4px; }
 }
