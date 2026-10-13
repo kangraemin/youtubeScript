@@ -44,10 +44,10 @@ e = validate_v3(ok(chapters=[{\"ts\":\"0:00\",\"title\":\"a\"},{\"ts\":\"3:00\",
 assert any(\"85%\" in x for x in e), e
 PY"
 
-# TC-5 (fail): 분량 상한(max(25%, 4000자)) 초과는 위반
-chk "TC-5 분량 상한" "$T
-e = validate_v3(ok(key_points=[{\"id\":f\"k{i}\",\"point\":\"p\",\"detail\":\"가\"*600} for i in range(10)]), RAW)
-assert any(\"상한\" in x for x in e), e
+# TC-5: 많은 정보가 있다는 이유로 저장을 거부하거나 삭제를 강제하지 않는다
+chk "TC-5 긴 요약 정보 보존" "$T
+e = validate_v3(ok(key_points=[{\"id\":f\"k{i}\",\"point\":\"p\",\"detail\":\"가\"*600} for i in range(20)]), RAW)
+assert e == [], e
 PY"
 
 # TC-6 (fail): positions에 quote 없거나 action 오타면 위반
@@ -56,12 +56,12 @@ e = validate_v3(ok(positions=[{\"asset\":\"삼성전자\",\"action\":\"buyy\"}])
 assert any(\"action\" in x for x in e) and any(\"quote 필수\" in x for x in e), e
 PY"
 
-# TC-7 (edge): entertainment는 key_points 3개 초과 금지, chapters 커버리지 면제
+# TC-7 (edge): entertainment도 내용 개수 상한 없음, chapters 커버리지 면제
 chk "TC-7 entertainment 축약" "$T
 e = validate_v3(ok(content_type=\"entertainment\", chapters=[]), RAW)
 assert e == [], e
 e = validate_v3(ok(content_type=\"entertainment\", key_points=[{\"id\":f\"k{i}\",\"point\":\"p\"} for i in range(4)]), RAW)
-assert any(\"1~3개\" in x for x in e), e
+assert e == [], e
 PY"
 
 # TC-8 (edge): transcript를 못 찾으면 원문 대조는 건너뛰고 구조 검사만

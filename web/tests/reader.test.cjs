@@ -64,14 +64,12 @@ test('모든 JSON 텍스트·인용·여섯 번째 이후 항목을 서버 HTML�
     else if (value) Object.entries(value).forEach(([k, v]) => verify(v, k))
   }
   verify(fixture)
-  assert.ok(html.includes('2개 더 보기'))
+  assert.ok(!html.includes('개 더 보기'))
   const buys = html.split('<section id="buys"')[1].split('</section>')[0]
-  const [firstPage, remaining] = buys.split('<details class="reader-more')
-  assert.ok(firstPage.includes('매수종목 4'))
-  assert.ok(!firstPage.includes('매수종목 5'))
-  assert.ok(remaining.includes('매수종목 5') && remaining.includes('매수종목 6'))
+  assert.ok(buys.includes('매수종목 0') && buys.includes('매수종목 6'))
+  assert.ok(buys.includes('매수이유 6.'))
   assert.ok(html.includes('href="' + youtubeJumpUrl('sample-video', '1:02:03').replaceAll('&', '&amp;') + '"'))
-  assert.doesNotMatch(html, /<details[^>]*\sopen(?:=|\s|>)/)
+  assert.doesNotMatch(html, /<details(?![^>]*\bopen)[^>]*>/)
   const ids = [...html.matchAll(/<section id="([^"]+)"/g)].map(match => match[1])
   assert.deepEqual(ids, ['overview', 'buys', 'sells', 'verdicts', 'macro', 'terms', 'lessons', 'watchlist', 'chart', 'data', 'actions', 'narrative'])
 })
@@ -82,16 +80,16 @@ test('빈 섹션을 생략하며 제목만 있는 요약과 미요약도 표시�
   assert.ok(render(null).includes('요약을 준비하고 있어요'))
 })
 
-test('긴 원문은 전체 요약 읽기에 기본 접힘으로 보존하며 임의 강조를 제거한다', () => {
+test('긴 원문도 기본 펼침으로 보존하고 각 문장을 목록으로 보여준다', () => {
   const sentence = '긴 설명과 수치를 보존하기 위해서 사용되는 문장으로 금리는 5.27%이며 정보가 누락되지 않아야 하고 문장의 끝에 있는 중요한 내용과 근거까지도 모두 남아 있어야 한다. '.repeat(4)
   const html = render({ raw_summary: sentence })
   assert.doesNotMatch(html, /<strong|<b\b|<section/)
-  assert.match(html, /<details class="reader-full-summary[^>]*><summary[^>]*>전체 요약 읽기/)
-  assert.doesNotMatch(html, /<details[^>]*\sopen(?:=|\s|>)/)
+  assert.match(html, /<details class="reader-full-summary[^>]* open=""><summary[^>]*>전체 요약 읽기/)
+  assert.doesNotMatch(html, /<details(?![^>]*\bopen)[^>]*>/)
   assert.ok(html.indexOf(sentence.slice(0, 20)) > html.indexOf('</summary>'))
   for (const part of splitSentences(sentence)) assert.ok(plain(html).includes(part))
   const css = fs.readFileSync(path.join(__dirname, '../app/globals.css'), 'utf8')
-  assert.match(css, /\.summary-body \.reader-sentences span\s*\{\s*line-height: 1\.7;/)
+  assert.match(css, /\.summary-body \.reader-sentences span\s*\{\s*line-height: 1\.[78];/)
 })
 
 test('한눈에 헤드라인을 보여주고 조건별 판단은 본문에 보존한다', () => {
@@ -100,7 +98,7 @@ test('한눈에 헤드라인을 보여주고 조건별 판단은 본문에 보�
   const html = render(summary, '채널')
   const overview = html.split('<section id="overview"')[1].split('</section>')[0]
   assert.match(overview, /<p class="source-label">채널 주말 속보<\/p>/)
-  assert.equal((overview.match(/<li\b/g) ?? []).length, 3)
+  assert.equal((overview.match(/<li\b/g) ?? []).length, 6)
   assert.doesNotMatch(overview, /truncate|line-clamp|<details|<summary|<button|⌄|긴 전체 요약|조건 3/)
   for (const point of splitHeadline(summary.headline)) assert.ok(plain(overview).includes(point))
   for (let i = 0; i < 4; i++) { assert.ok(plain(html).includes(`조건 ${i}`)); assert.ok(plain(html).includes(`결과 ${i}`)) }
@@ -116,14 +114,14 @@ test('짧다는 이유만으로 실제 정보를 채널 메타로 취급하지 �
   assert.equal(isHeadlineMeta('채널의 길고 상세한 경제 분석', '채널'), false)
 })
 
-test('짧은 설명·가격 구간은 펼치기 없이 읽고 인용만 접어둔다', () => {
+test('설명·가격 구간·인용은 기본 노출하고 문장을 목록으로 나눈다', () => {
   const html = render(fixture)
   const chart = html.split('<section id="chart"')[1].split('</section>')[0]
   const visible = chart.slice(0, chart.indexOf('<details'))
   assert.ok(plain(visible).includes('차트이유'))
   assert.ok(plain(visible).includes('123.45~150.50 지지선'))
   assert.doesNotMatch(visible, /truncate|line-clamp/)
-  assert.match(chart, /<details class="reader-quotes">/)
+  assert.match(chart, /<details class="reader-quotes" open="">/)
   assert.ok(plain(chart).includes('차트의 근거 원문.'))
   const terms = html.split('<section id="terms"')[1].split('</section>')[0]
   assert.ok(terms.indexOf('설명 영상') < terms.indexOf('<details'))
@@ -144,7 +142,7 @@ test('피드는 경량 응답·전체 요약·검색 근거와 포지션 태그�
   for (const tag of ['매수 7', '매도 2', '관전 3', '용어 4']) assert.ok(plain(light).includes(tag))
   const full = { ...transcript, summary: { headline: '전체 헤드라인', buys: [{ ticker: '삼성전자', reason: '저평가 매수', speaker: null, quotes: [] }] } }
   const searched = renderToStaticMarkup(React.createElement(VideoCard, { t: full, searchQuery: '삼성전자' }))
-  assert.ok(searched.includes('전체 헤드라인'))
+  assert.ok(searched.includes('저평가 매수'))
   assert.ok(searched.includes('<mark'))
   assert.ok(plain(searched).includes('매수 1'))
   assert.ok(!plain(searched).includes('매수 7'))
@@ -173,7 +171,21 @@ test('v3는 모든 본문과 여섯 번째 항목·용어 맥락·타임스탬�
   }
   const html=render(summary), text=plain(html)
   for(const expected of ['핵심 요약 문장','선택해서 볼 이유','검증종목','검증조건','매수계획 이유','검증화자','실제 발언 원문','주장 6','설명 6','인용 6','용어가 나온 맥락','설명의 끝까지 보존한다.','선행조건','예상결과','관측값 3.14%','기억할 교훈','찾아갈 주제','기업 이름','해결되지 않은 질문']) assert.ok(text.includes(expected),expected)
-  assert.ok(html.includes('2개 더 보기'))
+  assert.ok(!html.includes('개 더 보기'))
   assert.ok(html.includes(youtubeJumpUrl('sample-video','12:34').replaceAll('&','&amp;')))
   assert.doesNotMatch(html, /<h3><(?:p|details)/)
+})
+
+
+test('홈 카드는 제목만이 아니라 주장과 수치·조건을 직접 보여준다',()=>{
+ const {VideoCard}=require('../components/VideoCard.tsx')
+ const {cardPoints}=require('../lib/cardPoints.ts')
+ const t={vid:'x',channel:'채널',channel_slug:'x',title:'원래 영상 제목',summary:{schema:'v3',tldr:'짧은 소개',key_points:[{id:'k1',point:'금리가 변수',detail:'10년물 5% 아래면 유리하다. 다만 조건부 판단이다.'},{id:'k2',point:'반도체 확인',detail:'매출 증가율 20%가 기준이다.'}]}}
+ const points=cardPoints(t)
+ assert.equal(points.length,2)
+ assert.ok(points[0].text.includes('5%'))
+ const html=renderToStaticMarkup(React.createElement(VideoCard,{t}))
+ for(const word of ['금리가 변수','10년물 5% 아래면 유리하다.','매출 증가율 20%가 기준이다.'])assert.ok(plain(html).includes(word))
+ assert.match(html,/<ul class="card-points">/)
+ assert.doesNotMatch(html,/video-excerpt|line-clamp/)
 })

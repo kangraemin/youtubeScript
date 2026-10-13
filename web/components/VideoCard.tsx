@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { cardPoints } from '@/lib/cardPoints'
 import { Transcript } from '@/lib/supabase'
 import { getChannelMeta } from '@/lib/channels'
 import { thumbnailUrl } from '@/lib/youtube'
@@ -35,17 +36,20 @@ export function VideoCard({ t, showChannel = true, searchQuery }: Props) {
       <div className="video-card-main">
         <div className="video-copy">
           <h3>{t.title}</h3>
-          {headline ? (
-            <p className="video-excerpt">{headline}</p>
-          ) : (
-            <p className="video-excerpt">요약을 준비하고 있어요.</p>
-          )}
         </div>
         <div className="video-thumb">
           <img src={thumbnailUrl(t.vid, 'mq')} alt="" loading="lazy" />
           {duration && <span>{duration}</span>}
         </div>
       </div>
+      <ul className="card-points">
+        {cardPoints(t).map((point, i) => (
+          <li key={i}>
+            {point.title && <strong>{point.title}</strong>}
+            {point.text && <span>{point.text}</span>}
+          </li>
+        ))}
+      </ul>
       {reasons.length > 0 && (
         <div className="search-matches">
           {reasons.map((r, i) => (

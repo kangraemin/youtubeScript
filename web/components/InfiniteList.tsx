@@ -52,7 +52,7 @@ export function InfiniteList({
 
   // 상세→뒤로 시 재fetch 방지: items+done+scroll을 sessionStorage에 보존.
   // 쇼츠 필터가 키에 들어가야 필터별 목록이 서로 섞이지 않는다.
-  const storageKey = `il:${mode}:${channelSlug ?? ''}:${searchQuery ?? ''}:${hideShorts ? 'nosh' : 'all'}`
+  const storageKey = `il:points-v2:${mode}:${channelSlug ?? ''}:${searchQuery ?? ''}:${hideShorts ? 'nosh' : 'all'}`
 
   const loadMore = useCallback(async () => {
     if (inFlight.current || done) return
@@ -76,16 +76,12 @@ export function InfiniteList({
         data = r.data as Transcript[] | null
         err = r.error
       } else {
-        // 브라우즈 피드(latest/channel)는 경량 RPC — headline + 매수/매도/관전/용어 개수만.
-        // summary(13섹션 전체 jsonb)를 끌어오지 않아 페이로드가 작다.
-        const r = await supabase.rpc('feed_summaries', {
-          p_channel: mode === 'channel-summarized' ? channelSlug ?? null : null,
-          p_limit: pageSize,
-          p_offset: from,
-          p_min_duration: hideShorts ? SHORTS_THRESHOLD_SEC : 0,
-        })
-        data = r.data as Transcript[] | null
-        err = r.error
+        const params=new URLSearchParams({limit:String(pageSize),offset:String(from),minDuration:String(hideShorts?SHORTS_THRESHOLD_SEC:0)})
+        if(mode==='channel-summarized'&&channelSlug)params.set('channel',channelSlug)
+        const response=await fetch(`/api/feed?${params}`)
+        const payload=await response.json()
+        if(!response.ok)err={message:payload.error??'요약을 불러오지 못했어요.'}
+        else data=payload as Transcript[]
       }
 
       if (err) {
@@ -108,6 +104,8 @@ export function InfiniteList({
       })
       // 끝 판정은 걸러낸 뒤가 아니라 서버가 준 원본 개수로 해야 조기 종료되지 않는다.
       if (raw.length < pageSize) setDone(true)
+    } catch {
+      setError('연결을 확인하고 다시 시도해 주세요.')
     } finally {
       setLoading(false)
       inFlight.current = false

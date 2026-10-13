@@ -16,33 +16,20 @@ export function SentenceList({ text }: { text: string }) {
 
 export function ReadableText({
   text,
-  limit = 220,
   className = '',
 }: {
   text: string
   limit?: number
   className?: string
 }) {
-  if (text.length <= limit)
-    return <p className={`readable-text ${className}`}>{text}</p>
   return (
-    <details className={`readable-disclosure ${className}`}>
-      <summary>
-        <span className="reader-preview">{text.slice(0, limit)}…</span>
-        <span className="readable-open">내용 접기</span>
-        <span className="readable-closed">
-          전체 읽기 <span aria-hidden="true">＋</span>
-        </span>
-      </summary>
+    <div className={`readable-text ${className}`}>
       <SentenceList text={text} />
-    </details>
+    </div>
   )
 }
-
 export function LimitedList({
   items,
-  label,
-  bullets = false,
   compact = false,
 }: {
   items: ReactNode[]
@@ -50,42 +37,12 @@ export function LimitedList({
   bullets?: boolean
   compact?: boolean
 }) {
-  const list = (children: ReactNode[]) => (
-    <ul
-      className={
-        compact
-          ? 'reader-list reader-list-compact'
-          : bullets
-            ? 'reader-list reader-list-bullets'
-            : 'reader-list'
-      }
-    >
-      {children.map((item, i) => (
+  return (
+    <ul className={compact ? 'reader-list reader-list-compact' : 'reader-list'}>
+      {items.map((item, i) => (
         <li key={i}>{item}</li>
       ))}
     </ul>
-  )
-  return (
-    <>
-      {list(items.slice(0, 5))}
-      {items.length > 5 && (
-        <details className="reader-more">
-          <summary>
-            <span className="more-closed">
-              {items.length - 5}개 더 보기
-              <span className="sr-only"> · {label}</span>
-            </span>
-            <span className="more-open">
-              접기<span className="sr-only"> · {label}</span>
-            </span>
-            <span aria-hidden="true" className="disclosure-arrow">
-              ⌄
-            </span>
-          </summary>
-          {list(items.slice(5))}
-        </details>
-      )}
-    </>
   )
 }
 

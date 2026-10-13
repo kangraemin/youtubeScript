@@ -60,7 +60,7 @@ export function SummaryV3Card({
     !text ? null : ts ? (
       <QuoteList vid={vid} quotes={[{ timestamp: ts, text }]} />
     ) : (
-      <details className="reader-quotes">
+      <details className="reader-quotes" open>
         <summary>
           <span className="quote-symbol" aria-hidden="true">
             “

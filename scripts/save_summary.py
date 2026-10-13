@@ -32,10 +32,6 @@ POSITION_ACTIONS = {"buy", "sell", "add", "reduce", "hold", "plan_buy", "plan_se
 # 모델이 글자 수를 정확히 못 세서 목표치로 막으면 재시도만 늘고 품질 차이는 없다.
 TLDR_MAX = 150
 QUOTE_MAX = 180
-OUTPUT_RATIO_MAX = 0.25
-# 짧은 영상은 25%가 너무 작다. 손으로 쓴 v3 모범 샘플(12분·원문 4,856자)도 3,429자였다 —
-# JSON 키·ts만으로 수백 자가 든다. 바닥 4,000자를 두고, 25%는 긴 라이브의 비대화를 막는 데 쓴다.
-OUTPUT_FLOOR = 4000
 CHAPTER_COVERAGE = 0.85
 COVERAGE_MIN_SEC = 180  # 3분 미만은 chapters 커버리지를 보지 않는다
 
@@ -110,9 +106,8 @@ def validate_v3(summary: dict, transcript_raw) -> list:
         errs.append("watch_guide는 {verdict: skip|skim|watch, why} 필수")
 
     kps = summary.get("key_points")
-    lo, hi = (1, 3) if short else (1, 10)
-    if not isinstance(kps, list) or not lo <= len(kps) <= hi:
-        errs.append(f"key_points {lo}~{hi}개 필요 (현재 {len(kps) if isinstance(kps, list) else 0})")
+    if not isinstance(kps, list) or not kps:
+        errs.append("key_points 최소 1개 필요")
     else:
         for i, kp in enumerate(kps):
             if not isinstance(kp, dict) or not kp.get("point"):
@@ -126,11 +121,6 @@ def validate_v3(summary: dict, transcript_raw) -> list:
         if not p.get("quote"):
             errs.append(f"positions[{i}].quote 필수 — 매매 근거 발화가 없으면 positions가 아니라 key_points로")
 
-    for key, cap in (("numbers", 8), ("terms", 5), ("takeaways", 5)):
-        n = len(summary.get(key) or [])
-        if n > cap:
-            errs.append(f"{key} {n}개 — 최대 {cap}개")
-
     quotes = _quotes(summary)
     seen = {}
     for where, q in quotes:
@@ -143,7 +133,7 @@ def validate_v3(summary: dict, transcript_raw) -> list:
             seen[k] = where
 
     if transcript_raw is None:
-        print("v3 검증: transcript를 찾지 못해 원문 대조·분량·커버리지 검사는 건너뜀", file=sys.stderr)
+        print("v3 검증: transcript를 찾지 못해 원문 대조·커버리지 검사는 건너뜀", file=sys.stderr)
         return errs
 
     body, last_sec = _parse_transcript(transcript_raw)
@@ -152,17 +142,12 @@ def validate_v3(summary: dict, transcript_raw) -> list:
         if _norm(q) and _norm(q) not in body_norm:
             errs.append(f"{where}.quote가 transcript에 없음 — 원문 그대로 옮길 것: {q[:60]!r}")
 
-    out_len = len(json.dumps(summary, ensure_ascii=False))
-    limit = max(int(len(body) * OUTPUT_RATIO_MAX), OUTPUT_FLOOR)
-    if out_len > limit:
-        errs.append(f"출력 {out_len}자 > 상한 {limit}자(원문 {len(body)}자의 25%) — 항목·detail을 줄일 것")
-
     if not short and last_sec and last_sec >= COVERAGE_MIN_SEC:
         chs = [_ts_sec(c.get("ts")) for c in (summary.get("chapters") or []) if isinstance(c, dict)]
         chs = [c for c in chs if c is not None]
         need = int(last_sec * CHAPTER_COVERAGE)
         if not chs:
-            errs.append("chapters 필수(5~15개)")
+            errs.append("chapters 필수(내용의 전개에 맞춰 구분)")
         elif max(chs) < need:
             errs.append(f"chapters 마지막 ts {max(chs)}s < 영상 길이 {last_sec}s의 85%({need}s) — 후반부까지 읽고 chapters를 채울 것")
     return errs

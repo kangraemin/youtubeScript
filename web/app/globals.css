@@ -1276,3 +1276,140 @@ details[open] > summary > .disclosure-arrow {
     transition: none !important;
   }
 }
+
+/* 독자는 제목 아래의 요점만 읽어도 내용을 파악할 수 있어야 한다. */
+.card-points {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+.card-points li {
+  position: relative;
+  padding-left: 15px;
+  font-size: 14px;
+  line-height: 1.75;
+}
+.card-points li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  top: 0;
+  color: var(--accent);
+}
+.card-points strong {
+  display: block;
+  font-size: 15px;
+  line-height: 1.6;
+  margin-bottom: 4px;
+  color: var(--ink);
+  font-weight: 700;
+}
+.card-points span {
+  color: #48564d;
+}
+.video-card-main {
+  flex: 0;
+}
+.video-copy h3 {
+  display: block;
+  overflow: visible;
+  font-size: 16px;
+  line-height: 1.55;
+  color: #48574e;
+}
+.video-thumb {
+  width: 74px;
+}
+.home-intro {
+  padding-bottom: 18px;
+}
+.home-intro h1 {
+  font-size: 29px;
+}
+.home-intro h1 br {
+  display: none;
+}
+.home-intro > p:last-child {
+  margin-top: 8px;
+}
+.home-intro .eyebrow {
+  display: none;
+}
+.readable-text .reader-sentences {
+  margin-top: 0;
+}
+.reader-sentences {
+  gap: 9px;
+}
+.sentence-dot {
+  width: 4px;
+  height: 4px;
+  background: #638453;
+}
+.summary-body .reader-sentences span {
+  line-height: 1.8;
+}
+.reader-quotes[open] > summary {
+  min-height: 40px;
+}
+.quote-content {
+  border-left: 2px solid #bdd0ad;
+  border-radius: 0 7px 7px 0;
+}
+.quote-content .sentence-dot {
+  display: none;
+}
+.reader-full-summary[open] > summary {
+  justify-content: flex-start;
+}
+.overview-points .reader-sentences li {
+  display: block;
+}
+.overview-points .sentence-dot {
+  display: none;
+}
+@media (max-width: 640px) {
+  .home-intro h1 {
+    font-size: 23px;
+    line-height: 1.4;
+    letter-spacing: -1px;
+  }
+  .home-intro h1 span {
+    display: block;
+  }
+  .home-intro > p:last-child {
+    font-size: 11px;
+  }
+  .card-points li {
+    font-size: 14px;
+  }
+  .card-points strong {
+    font-size: 15px;
+  }
+  .video-card {
+    padding: 20px;
+  }
+  .video-copy h3 {
+    font-size: 15px;
+  }
+  .term-card {
+    grid-template-columns: 1fr;
+  }
+  .term-index {
+    display: none;
+  }
+  .overview-card {
+    padding: 20px;
+  }
+  .reader-sections {
+    gap: 30px;
+  }
+  .insight-card h3 {
+    font-size: 19px;
+  }
+  .feed-heading h2 {
+    font-size: 18px;
+  }
+}
+
+.flow-title { font-size:17px; font-weight:700; line-height:1.65; margin-top:8px; }

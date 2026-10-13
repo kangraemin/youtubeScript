@@ -117,6 +117,7 @@ export type SummaryV3 = {
 export type Summary = SummaryV2 | SummaryV3
 
 export type Transcript = {
+  preview_points?: { title: string; text: string }[]
   vid: string
   channel: string
   channel_slug: string

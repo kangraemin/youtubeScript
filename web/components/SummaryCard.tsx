@@ -213,18 +213,11 @@ export function SummaryCard({ vid, summary, channel }: Props) {
         ? splitNarrative(summary.narrative).map((step, i) => {
             const { time, title } = narrativeHeading(step)
             return (
-              <details key={i} className="reader-flow">
-                <summary>
-                  <span className="chapter-time">
-                    {time || String(i + 1).padStart(2, '0')}
-                  </span>
-                  <span>{title}</span>
-                  <span aria-hidden="true" className="disclosure-arrow">
-                    ⌄
-                  </span>
-                </summary>
-                <SentenceList text={step} />
-              </details>
+              <div key={i} className="reader-flow">
+                <p className="chapter-time">{time || String(i+1).padStart(2,'0')}</p>
+                <h3 className="flow-title">{title.split(/[:：]/u)[0]}</h3>
+                <SentenceList text={step}/>
+              </div>
             )
           })
         : [],
@@ -268,7 +261,7 @@ export function SummaryCard({ vid, summary, channel }: Props) {
         </section>
       )}
       {summary.raw_summary && (
-        <details className="reader-full-summary">
+        <details className="reader-full-summary" open>
           <summary>
             전체 요약 읽기{' '}
             <span aria-hidden="true" className="disclosure-arrow">

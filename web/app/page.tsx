@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { fetchFeedPage } from '@/lib/feed'
 import { supabase, Transcript } from '@/lib/supabase'
 import { STOCK_ECON_SLUGS, getChannelMeta } from '@/lib/channels'
 import { SearchableFeed } from '@/components/SearchableFeed'
@@ -51,14 +52,7 @@ async function fetchChannelStats(): Promise<ChannelStat[]> {
 // 쇼츠 숨김이 기본값이므로 서버 데이터도 같은 기준으로 가져온다.
 // 기준이 어긋나면 기본 사용자가 카드를 봤다가 다시 로딩되는 깜빡임을 겪는다.
 async function fetchInitialFeed(): Promise<Transcript[]> {
-  const { data, error } = await supabase.rpc('feed_summaries', {
-    p_channel: null,
-    p_limit: 20,
-    p_offset: 0,
-    p_min_duration: SHORTS_THRESHOLD_SEC,
-  })
-  if (error) throw error
-  return (data ?? []) as Transcript[]
+  return fetchFeedPage({minDuration: SHORTS_THRESHOLD_SEC})
 }
 
 export default async function HomePage() {
@@ -72,11 +66,7 @@ export default async function HomePage() {
     <main className="page-shell">
       <header className="home-intro">
         <p className="eyebrow">YOUR DAILY ECONOMY</p>
-        <h1>
-          긴 영상 속 핵심을,
-          <br />
-          <span>내가 읽는 속도로.</span>
-        </h1>
+        <h1>오늘의 경제 브리핑</h1>
         <p>
           {channelStats.length}개 경제 채널의 이야기. 매매 발언부터 경제
           개념까지.

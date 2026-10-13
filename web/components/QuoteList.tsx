@@ -5,7 +5,7 @@ import { SentenceList } from './reader/ReaderPrimitives'
 export function QuoteList({ vid, quotes }: { vid: string; quotes?: Quote[] }) {
   if (!quotes?.length) return null
   return (
-    <details className="reader-quotes">
+    <details className="reader-quotes" open>
       <summary>
         <span className="quote-symbol" aria-hidden="true">
           “
