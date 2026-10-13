@@ -198,9 +198,11 @@ test('학습 본문은 짧은 요약과 별도로 앞에 나오며 모든 주제
  assert.ok(html.indexOf('id="learning"')<html.indexOf('<section id="key-points"'))
  for(const topic of guide.topics){
   assert.ok(text.includes(topic.title))
-  for(const p of [...topic.points,...topic.background,...topic.takeaways])assert.ok(text.includes(p),p)
+  for(const p of [...topic.points,...topic.background,...topic.takeaways])assert.ok(text.replace(/\s/g,'').includes(p.replace(/\s/g,'')),p)
  }
- for(const p of guide.perspectives){assert.ok(text.includes(p.view));assert.ok(text.includes(p.watch))}
+ for(const p of guide.perspectives){for(const sentence of splitSentences(p.view+' '+p.watch))assert.ok(text.includes(sentence))}
+ assert.match(html, /class="study-point-lead"/)
+ assert.match(html, /class="study-point-details"><li>/)
  assert.ok(text.includes('ESS로 다시 읽는다'))
  assert.doesNotMatch(html,/<details(?![^>]*\bopen)[^>]*>/)
  const {cardPoints}=require('../lib/cardPoints.ts')

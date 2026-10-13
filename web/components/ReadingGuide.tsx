@@ -1,10 +1,21 @@
 import type { ReadingGuide as Guide } from '@/lib/readingGuide'
+import { splitSentences } from './reader/text'
 function Points({ items }: { items: string[] }) {
   return (
     <ul className="study-points">
-      {items.map((item, i) => (
-        <li key={i}>{item}</li>
-      ))}
+      {items.map((item, i) => {
+        const [lead, ...details] = splitSentences(item)
+        return (
+          <li key={i}>
+            <span className="study-point-lead">{lead}</span>
+            {details.length > 0 && (
+              <ul className="study-point-details">
+                {details.map((sentence, j) => <li key={j}>{sentence}</li>)}
+              </ul>
+            )}
+          </li>
+        )
+      })}
     </ul>
   )
 }
@@ -18,7 +29,7 @@ export function ReadingGuide({ guide }: { guide: Guide }) {
       <header className="study-intro">
         <p className="eyebrow">영상을 읽는 해설</p>
         <h2 id="learning-heading">{guide.title}</h2>
-        <p>{guide.introduction}</p>
+        <Points items={[guide.introduction]} />
       </header>
       <nav className="study-index" aria-label="해설 차례">
         <p>이 글에서 배울 내용</p>

@@ -1801,3 +1801,10 @@ details[open] > summary > .disclosure-arrow {
   .reader-jump { min-height: 34px; padding: 0 9px; font-size: 12px; }
   .reader-nav { margin-inline: -4px; padding: 6px 4px; }
 }
+
+/* 한 항목 한 문장: 핵심 문장 아래 설명을 별도 하위 목록으로 둔다. */
+.study-point-lead { font-weight: 650; color: #263e2e; }
+.study-point-details { list-style: circle; padding-left: 18px; margin-top: 7px; display: grid; gap: 6px; }
+.study-point-details > li { font-size: 15px; line-height: 1.7; font-weight: 400; color: #465348; padding-left: 1px; }
+.study-point-details > li::marker { color: #81957e; }
+.study-intro > .study-points { margin-top: 16px; }
