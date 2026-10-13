@@ -37,7 +37,7 @@ const AGENT_PROMPT = `당신은 유튜브 주식·경제 transcript 요약 작�
 요약 범위는 채널 정책이 정한다(경제 30일 / 교양 제한없음) — 별도 환경변수를 붙이지 마라.
 
 0. 최초 1회만: ${ROOT}/prompts/summary-guidelines.md 를 Read 한다.
-   (출력 JSON 스키마 v3 · quote verbatim 규칙 · 분량 예산의 정본이다.)
+   (출력 JSON 스키마 v3 · quote verbatim 규칙 · 학습 본문·전수 독해의 정본이다.)
 
 각 회차:
 
@@ -63,7 +63,7 @@ const AGENT_PROMPT = `당신은 유튜브 주식·경제 transcript 요약 작�
    라이브 영상은 1,500~3,000줄까지 간다. 마지막 청크까지 읽지 않은 상태로 JSON을 만들지 않는다.
 
 4. 가이드라인의 v3 JSON을 만든다 ("schema": "v3" 필수).
-   - 결론과 근거를 2분 안에 읽히게 압축한다. 한 사실은 한 곳에만 쓴다.
+   - 짧은 개요와 reading_guide 학습 본문을 별도로 작성한다. 영상 전체의 배움·화자 관점·경제 배경지식을 생략하지 않는다.
    - quote는 transcript 원문 발화 그대로(한 줄 안에서, 150자 이내), ts는 라인 앞 타임스탬프 그대로.
    - chapters 마지막 ts가 영상 길이의 85% 이후여야 한다 — 후반부까지 읽었다는 증거다.
    - "_model": "claude-opus-5" 를 포함한다.
@@ -72,7 +72,7 @@ const AGENT_PROMPT = `당신은 유튜브 주식·경제 transcript 요약 작�
    Write 도구로 JSON을 /tmp/summary_<vid>.json 에 쓴 뒤
    cd ${ROOT} && source .env.local && cat /tmp/summary_<vid>.json | .venv/bin/python scripts/save_summary.py <vid>
    "saved: <vid>" 출력을 확인한다.
-   save_summary.py는 v3 규칙(필수 필드·quote 원문 존재·분량 예산·quote 중복·후반부 커버리지)을 기계 검증한다.
+   save_summary.py는 v3 규칙(필수 필드·quote 원문 존재·학습 본문·전수 독해·quote 중복·후반부 커버리지)을 기계 검증한다.
    "v3 검증 실패"가 나오면 stderr의 항목을 고쳐 다시 Write → 저장한다(최대 2회 재시도).
    그래도 실패하면 done 카운트를 올리지 않는다.
 

@@ -1,3 +1,4 @@
+import type { ReadingGuide } from './readingGuide'
 import { createClient } from '@supabase/supabase-js'
 
 export const supabase = createClient(
@@ -73,6 +74,7 @@ export type ActionItem = {
 }
 
 export type SummaryV2 = {
+  reading_guide?: ReadingGuide
   schema?: never
   buys?: BuySell[]
   sells?: BuySell[]
@@ -91,6 +93,7 @@ export type SummaryV2 = {
 
 export type SummaryV3 = {
   schema: 'v3'
+  reading_guide?: ReadingGuide
   content_type: string
   tldr: string
   watch_guide: { verdict: 'skip' | 'skim' | 'watch'; why: string }

@@ -1,10 +1,19 @@
 import type { Summary, Transcript } from './supabase'
-import { splitHeadline, splitSentences } from '@/components/reader/text'
+import { splitHeadline } from '@/components/reader/text'
 export type CardPoint = { title: string; text: string }
 export function cardPoints(t: Transcript): CardPoint[] {
   if (t.preview_points?.length) return t.preview_points
   const s = t.summary
   const points: CardPoint[] = []
+  if (s?.reading_guide) {
+    const g = s.reading_guide
+    return [
+      { title: '다룬 이야기', text: g.title },
+      ...g.perspectives
+        .slice(0, 2)
+        .map((p) => ({ title: `${p.name}의 관점`, text: p.view })),
+    ]
+  }
   if (s?.schema === 'v3') {
     for (const p of s.key_points ?? [])
       points.push({

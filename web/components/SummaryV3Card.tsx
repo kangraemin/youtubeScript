@@ -1,3 +1,5 @@
+import { NumericFact } from './reader/NumericFact'
+import { ReadingGuide } from './ReadingGuide'
 import type { ReactNode } from 'react'
 import type { SummaryV3 } from '@/lib/supabase'
 import { youtubeJumpUrl } from '@/lib/timestamp'
@@ -84,7 +86,7 @@ export function SummaryV3Card({
   }[] = [
     {
       id: 'positions',
-      title: '누가, 무엇을 사고팔았나',
+      title: '매수·매도 발언',
       nav: '매수·매도',
       description: '출연자의 발언을 모았어요. 계획과 실행을 구분해 읽어보세요.',
       items:
@@ -119,7 +121,7 @@ export function SummaryV3Card({
     },
     {
       id: 'key-points',
-      title: '이 영상에서 알아둘 것',
+      title: '핵심 주장과 이유',
       nav: '핵심 내용',
       description: '주장과 그 이유를 함께 읽어요.',
       items:
@@ -139,7 +141,7 @@ export function SummaryV3Card({
     },
     {
       id: 'scenarios',
-      title: '어떤 변화에 주목할까',
+      title: '조건별 전망',
       nav: '관전 포인트',
       description: '방송에서 제시한 조건과 예상이에요.',
       items:
@@ -162,7 +164,7 @@ export function SummaryV3Card({
     },
     {
       id: 'terms',
-      title: '경제 용어, 여기서 이해하기',
+      title: '용어와 배경지식',
       nav: '경제 용어',
       description: '낯선 말은 뜻과 맥락을 함께 확인해요.',
       items:
@@ -212,13 +214,13 @@ export function SummaryV3Card({
     },
     {
       id: 'numbers',
-      title: '숫자로 짚어보기',
+      title: '주요 수치와 기준',
       nav: '주요 숫자',
       description: '방송에서 언급한 수치예요. 기준 시점을 함께 확인하세요.',
       items:
         summary.numbers?.map((p, i) => (
           <div key={i} className="number-card">
-            <ReadableText text={p.fact} />
+            <NumericFact text={p.fact} />
             {time(p.ts)}
           </div>
         )) ?? [],
@@ -247,7 +249,7 @@ export function SummaryV3Card({
     },
     {
       id: 'entities',
-      title: '함께 나온 이름들',
+      title: '언급된 기업·인물',
       nav: '주요 대상',
       description: '방송에 등장한 기업과 인물.',
       items:
@@ -291,15 +293,21 @@ export function SummaryV3Card({
           </div>
         )}
       </section>
-      {sections.length > 0 && (
+      {(sections.length > 0 || summary.reading_guide) && (
         <>
           <ReaderNav
             sections={[
               { id: 'overview', title: '한눈에' },
+              ...(summary.reading_guide
+                ? [{ id: 'learning', title: '깊이 읽기' }]
+                : []),
               ...sections.map((s) => ({ id: s.id, title: s.nav ?? s.title })),
             ]}
           />
           <div className="reader-sections">
+            {summary.reading_guide && (
+              <ReadingGuide guide={summary.reading_guide} />
+            )}
             {sections.map((s) => (
               <section
                 key={s.id}

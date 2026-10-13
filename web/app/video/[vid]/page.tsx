@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { getReadingGuide } from '@/lib/readingGuides'
 import { supabase, Transcript } from '@/lib/supabase'
 import { SummaryCard } from '@/components/SummaryCard'
 import { getChannelMeta } from '@/lib/channels'
@@ -72,7 +73,15 @@ export default async function VideoPage({
       <div className="detail-summary">
         <SummaryCard
           vid={t.vid}
-          summary={t.summary ?? null}
+          summary={
+            t.summary
+              ? {
+                  ...t.summary,
+                  reading_guide:
+                    getReadingGuide(t.vid) ?? t.summary.reading_guide,
+                }
+              : null
+          }
           channel={t.channel}
         />
       </div>

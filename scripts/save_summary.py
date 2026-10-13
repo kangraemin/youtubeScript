@@ -89,11 +89,14 @@ def _quotes(summary: dict):
     return out
 
 
-def validate_v3(summary: dict, transcript_raw) -> list:
+def validate_v3(summary: dict, transcript_raw, require_reading_guide=False) -> list:
     errs = []
     if summary.get("content_type") not in V3_CONTENT_TYPES:
         errs.append(f"content_type은 {sorted(V3_CONTENT_TYPES)} 중 하나여야 함: {summary.get('content_type')!r}")
     short = summary.get("content_type") in V3_SHORT_TYPES
+    if require_reading_guide and not short:
+        from scripts.validate_reading_guide import validate_reading_guide
+        errs.extend(validate_reading_guide(summary.get("reading_guide"), transcript_raw))
 
     tldr = summary.get("tldr")
     if not isinstance(tldr, str) or not tldr.strip():
@@ -164,7 +167,7 @@ def main() -> int:
     model = summary.pop("_model", "claude-sonnet-4-6")
 
     if summary.get("schema") == "v3":
-        errs = validate_v3(summary, find_transcript(vid))
+        errs = validate_v3(summary, find_transcript(vid), require_reading_guide=True)
         if errs:
             print(f"v3 검증 실패 ({vid}) — 저장하지 않음:", file=sys.stderr)
             for e in errs:

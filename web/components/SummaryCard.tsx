@@ -1,3 +1,5 @@
+import { NumericFact } from './reader/NumericFact'
+import { ReadingGuide } from './ReadingGuide'
 import { SummaryV3Card } from './SummaryV3Card'
 import type { ReactNode } from 'react'
 import type { Quote, Summary } from '@/lib/supabase'
@@ -100,7 +102,7 @@ export function SummaryCard({ vid, summary, channel }: Props) {
     },
     {
       id: 'verdicts',
-      title: '어떤 변화에 주목할까',
+      title: '조건별 전망',
       nav: '관전 포인트',
       description: '출연자의 판단과 그 판단이 성립하는 조건.',
       items:
@@ -126,7 +128,7 @@ export function SummaryCard({ vid, summary, channel }: Props) {
     },
     {
       id: 'terms',
-      title: '경제 용어, 여기서 이해하기',
+      title: '용어와 배경지식',
       nav: '경제 용어',
       description: '낯선 말은 뜻과 맥락을 함께 확인해요.',
       items:
@@ -186,13 +188,16 @@ export function SummaryCard({ vid, summary, channel }: Props) {
     },
     {
       id: 'data',
-      title: '숫자로 짚어보기',
+      title: '주요 수치와 기준',
       nav: '주요 숫자',
       description: '방송에서 언급한 수치와 근거.',
       items:
-        summary.data_points?.map((it) =>
-          row(it.datum, undefined, undefined, it.quotes),
-        ) ?? [],
+        summary.data_points?.map((it, i) => (
+          <div key={i} className="number-card">
+            <NumericFact text={it.datum} />
+            <QuoteList vid={vid} quotes={it.quotes} />
+          </div>
+        )) ?? [],
     },
     {
       id: 'actions',
@@ -214,9 +219,11 @@ export function SummaryCard({ vid, summary, channel }: Props) {
             const { time, title } = narrativeHeading(step)
             return (
               <div key={i} className="reader-flow">
-                <p className="chapter-time">{time || String(i+1).padStart(2,'0')}</p>
+                <p className="chapter-time">
+                  {time || String(i + 1).padStart(2, '0')}
+                </p>
                 <h3 className="flow-title">{title.split(/[:：]/u)[0]}</h3>
-                <SentenceList text={step}/>
+                <SentenceList text={step} />
               </div>
             )
           })
@@ -271,15 +278,21 @@ export function SummaryCard({ vid, summary, channel }: Props) {
           <SentenceList text={summary.raw_summary} />
         </details>
       )}
-      {sections.length > 0 && (
+      {(sections.length > 0 || summary.reading_guide) && (
         <>
           <ReaderNav
             sections={[
               ...(hasOverview ? [{ id: 'overview', title: '한눈에' }] : []),
+              ...(summary.reading_guide
+                ? [{ id: 'learning', title: '깊이 읽기' }]
+                : []),
               ...sections.map((s) => ({ id: s.id, title: s.nav })),
             ]}
           />
           <div className="reader-sections">
+            {summary.reading_guide && (
+              <ReadingGuide guide={summary.reading_guide} />
+            )}
             {sections.map((s) => (
               <section
                 key={s.id}

@@ -189,3 +189,22 @@ test('홈 카드는 제목만이 아니라 주장과 수치·조건을 직접 �
  assert.match(html,/<ul class="card-points">/)
  assert.doesNotMatch(html,/video-excerpt|line-clamp/)
 })
+
+test('학습 본문은 짧은 요약과 별도로 앞에 나오며 모든 주제·배경·관점을 보존한다',()=>{
+ const guide=JSON.parse(fs.readFileSync(path.join(__dirname,'../content/reading-guides/WtEo31SpSeI.json'),'utf8'))
+ const html=render({schema:'v3',tldr:'짧은 별도 요약',watch_guide:{verdict:'watch',why:'검토'},key_points:[{id:'k1',point:'기존 핵심'}],reading_guide:guide})
+ const text=plain(html)
+ assert.ok(text.includes('짧은 별도 요약'))
+ assert.ok(html.indexOf('id="learning"')<html.indexOf('<section id="key-points"'))
+ for(const topic of guide.topics){
+  assert.ok(text.includes(topic.title))
+  for(const p of [...topic.points,...topic.background,...topic.takeaways])assert.ok(text.includes(p),p)
+ }
+ for(const p of guide.perspectives){assert.ok(text.includes(p.view));assert.ok(text.includes(p.watch))}
+ assert.ok(text.includes('ESS로 다시 읽는다'))
+ assert.doesNotMatch(html,/<details(?![^>]*\bopen)[^>]*>/)
+ const {cardPoints}=require('../lib/cardPoints.ts')
+ const points=cardPoints({summary:{reading_guide:guide}})
+ assert.ok(points.some(p=>p.title==='함정남의 관점'))
+ assert.ok(points.some(p=>p.text===guide.title))
+})

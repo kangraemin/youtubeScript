@@ -1412,4 +1412,413 @@ details[open] > summary > .disclosure-arrow {
   }
 }
 
-.flow-title { font-size:17px; font-weight:700; line-height:1.65; margin-top:8px; }
+.flow-title {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.65;
+  margin-top: 8px;
+}
+.study-guide {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 32px;
+}
+.study-intro h2 {
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.5;
+  letter-spacing: -0.8px;
+}
+.study-intro > p:last-child {
+  font-size: 16px;
+  line-height: 1.9;
+  margin-top: 18px;
+  color: #44534b;
+}
+.study-index {
+  border-block: 1px solid var(--line);
+  margin: 28px 0;
+  padding: 20px 0;
+}
+.study-index > p {
+  font-size: 13px;
+  font-weight: 750;
+  margin-bottom: 12px;
+}
+.study-index ol {
+  display: grid;
+  gap: 3px;
+}
+.study-index a {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  min-height: 44px;
+  font-size: 14px;
+  line-height: 1.7;
+  padding: 9px 0;
+}
+.study-index a > span {
+  flex: 0 0 18px;
+  white-space: nowrap;
+  color: var(--accent);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.study-perspectives > h3 {
+  font-size: 20px;
+  font-weight: 750;
+}
+.study-perspectives > div {
+  margin-top: 20px;
+}
+.study-perspectives h4 {
+  font-weight: 750;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.study-topic {
+  scroll-margin-top: 86px;
+  border-top: 1px solid var(--line);
+  margin-top: 36px;
+  padding-top: 30px;
+}
+.study-kicker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 14px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.study-kicker > span:first-child {
+  color: var(--accent);
+  font-weight: 750;
+}
+.study-topic h3 {
+  font-size: 23px;
+  line-height: 1.5;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  margin-bottom: 18px;
+}
+.study-points {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding-left: 19px;
+  list-style: disc;
+}
+.study-points > li {
+  font-size: 16px;
+  line-height: 1.95;
+  color: #34473c;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  padding-left: 3px;
+}
+.study-points > li::marker {
+  color: #668257;
+}
+.study-background {
+  background: #f2f5ed;
+  padding: 22px;
+  margin-top: 24px;
+  border-left: 3px solid #9db585;
+  border-radius: 0 8px 8px 0;
+}
+.study-background h4,
+.study-takeaway h4,
+.study-caveats h4 {
+  font-weight: 750;
+  font-size: 15px;
+  margin-bottom: 13px;
+}
+.study-background h4 > span {
+  font-size: 10px;
+  font-weight: 500;
+  margin-left: 8px;
+  color: #6c7c61;
+}
+.study-background .study-points > li {
+  font-size: 15px;
+}
+.study-takeaway {
+  padding: 22px 0 0;
+}
+.study-takeaway h4 {
+  color: var(--accent);
+}
+.study-sources {
+  border-top: 1px solid var(--line);
+  padding-top: 24px;
+  margin-top: 30px;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.study-sources h3 {
+  font-weight: 700;
+  color: var(--ink);
+}
+.study-sources a {
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.study-sources p {
+  margin-top: 14px;
+}
+@media (max-width: 640px) {
+  .study-guide {
+    padding: 22px 18px;
+    margin: 0 -8px;
+  }
+  .study-intro h2 {
+    font-size: 24px;
+  }
+  .study-intro > p:last-child {
+    font-size: 15px;
+  }
+  .study-topic h3 {
+    font-size: 21px;
+  }
+  .study-points > li {
+    font-size: 15px;
+    line-height: 1.95;
+  }
+  .study-background {
+    padding: 18px 14px;
+  }
+  .study-background .study-points > li {
+    font-size: 14px;
+  }
+  .study-index a {
+    font-size: 13px;
+  }
+  .study-topic {
+    margin-top: 30px;
+    padding-top: 25px;
+  }
+}
+
+/* 영상의 정체성 → 제목 → 실제 논점 순서로 읽는 피드 카드. */
+.video-card {
+  padding: 0;
+  overflow: hidden;
+}
+.video-card > .video-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin: 0;
+  border-radius: 0;
+}
+.video-card > .video-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.video-card > .video-thumb > span {
+  right: 10px;
+  bottom: 10px;
+  padding: 3px 7px;
+  font-size: 12px;
+  font-weight: 650;
+  background: #101913e8;
+}
+.video-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 22px;
+}
+.video-card .video-meta {
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.video-card .video-card-main {
+  display: block;
+}
+.video-card .video-copy h3 {
+  font-size: 22px;
+  line-height: 1.45;
+  color: #1d2d23;
+  font-weight: 800;
+  letter-spacing: -0.65px;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.video-card .card-points {
+  border-top: 1px solid var(--line);
+  margin-top: 20px;
+  padding-top: 18px;
+}
+.video-card .video-card-bottom {
+  margin-top: auto;
+}
+.video-card .card-points + .video-card-bottom {
+  margin-top: 20px;
+}
+@media (max-width: 640px) {
+  .video-card-body {
+    padding: 20px;
+  }
+  .video-card .video-copy h3 {
+    font-size: 21px;
+  }
+  .feed-grid {
+    gap: 24px;
+  }
+}
+
+/* 섹션의 위치와 수치를 훑어볼 수 있는 압축된 정보 계층. */
+.reader-nav-select {
+  display: none;
+}
+.reader-sections {
+  gap: 28px;
+  margin-top: 22px;
+}
+.section-heading {
+  margin-bottom: 12px;
+  padding: 10px 0 10px 12px;
+  border-left: 4px solid #315943;
+}
+.section-heading h2 {
+  font-size: 23px;
+  color: #203c2a;
+}
+.section-heading p {
+  margin-top: 4px;
+}
+.reader-list {
+  gap: 8px;
+}
+.insight-card,
+.position-card,
+.lesson-card,
+.scenario-card,
+.question-card {
+  padding: 17px 18px;
+}
+.insight-card h3,
+.asset-name {
+  margin-bottom: 8px;
+  line-height: 1.45;
+}
+.item-topline {
+  margin-bottom: 8px;
+}
+.reader-section .reader-sentences {
+  gap: 7px;
+}
+.reader-section .readable-text {
+  line-height: 1.7;
+}
+.section-numbers .reader-list,
+.section-data .reader-list {
+  gap: 0;
+  border: 1px solid #ccd7cd;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.section-numbers .reader-list > li + li,
+.section-data .reader-list > li + li {
+  border-top: 1px solid #dce3da;
+}
+.number-card {
+  display: block;
+  border: 0;
+  border-radius: 0;
+  padding: 14px 17px;
+  background: #fff;
+}
+.numeric-fact {
+  color: #334137;
+  font-size: 15px;
+  line-height: 1.65;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+.numeric-fact strong {
+  color: #183f2a;
+  font-size: 23px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.number-card > .time-link {
+  display: inline-flex;
+  min-height: 24px;
+  margin-top: 4px;
+}
+.number-card .quote-disclosure {
+  margin-top: 8px;
+}
+@media (max-width: 640px) {
+  .reader-nav-track {
+    display: none;
+  }
+  .reader-nav-select {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 14px;
+  }
+  .reader-nav-select > span {
+    font-size: 12px;
+    color: #3c5443;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .reader-nav-select select {
+    min-width: 0;
+    width: 62%;
+    min-height: 42px;
+    font-size: 14px;
+    font-weight: 750;
+    color: #244c33;
+    background: white;
+    border: 1px solid #abc0ad;
+    border-radius: 7px;
+    padding: 8px;
+  }
+  .reader-sections {
+    gap: 25px;
+    margin-top: 20px;
+  }
+  .section-heading h2 {
+    font-size: 21px;
+  }
+  .insight-card,
+  .position-card,
+  .lesson-card,
+  .scenario-card,
+  .question-card {
+    padding: 15px 16px;
+  }
+  .number-card {
+    padding: 12px 15px;
+  }
+  .numeric-fact strong {
+    font-size: 22px;
+  }
+  .study-guide {
+    padding: 20px;
+  }
+  .study-background {
+    padding: 14px;
+    margin-top: 16px;
+  }
+  .study-points > li {
+    line-height: 1.75;
+  }
+  .study-points {
+    gap: 10px;
+  }
+}

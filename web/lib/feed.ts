@@ -1,5 +1,6 @@
 import { supabase, type Transcript } from './supabase'
 import { cardPoints } from './cardPoints'
+import { getReadingGuide } from './readingGuides'
 
 // 카드에는 개수 대신 실제 논점을 보낸다. 전체 요약 JSON은 서버에서만 읽고 카드 3개 요점만 전달한다.
 export async function fetchFeedPage({
@@ -33,6 +34,13 @@ export async function fetchFeedPage({
   const summaries = new Map((content.data ?? []).map((t) => [t.vid, t.summary]))
   return rows.map((t) => ({
     ...t,
-    preview_points: cardPoints({ ...t, summary: summaries.get(t.vid) }),
+    preview_points: cardPoints({
+      ...t,
+      summary: {
+        ...summaries.get(t.vid),
+        reading_guide:
+          getReadingGuide(t.vid) ?? summaries.get(t.vid)?.reading_guide,
+      },
+    }),
   }))
 }
