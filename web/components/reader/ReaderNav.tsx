@@ -31,8 +31,8 @@ export function ReaderNav({ sections }: { sections: { id: string; title: string 
     }
   }, [sections])
 
-  return <nav aria-label="요약 목차" className="sticky top-0 z-10 mb-8 min-w-0 border-y border-zinc-800 bg-bg/95 backdrop-blur">
-    <div className="flex gap-1 overflow-x-auto py-2">
+  return <nav aria-label="요약 목차" className="reader-nav">
+    <div className="reader-nav-track">
       {sections.map(({ id, title }) => <a key={id} href={`#${id}`} className="reader-jump"
         aria-current={current === id ? 'location' : undefined}>{title}</a>)}
     </div>

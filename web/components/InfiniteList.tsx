@@ -200,16 +200,16 @@ export function InfiniteList({
 
   return (
     <>
-      <div className="mb-4 flex items-center justify-end">
+      <div className="feed-toolbar">
         <ShortsFilter value={hideShorts} onChange={setHideShorts} />
       </div>
 
       {items.length === 0 && !loading ? (
-        <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-8 text-center text-zinc-400">
+        <div className="empty-state">
           {hideShorts ? '3분 이상 영상이 없어요. 필터를 꺼보세요.' : '표시할 영상이 없어요.'}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
+        <div className="feed-grid">
           {items.map((t) => (
             <VideoCard
               key={t.vid}

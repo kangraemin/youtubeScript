@@ -3,113 +3,348 @@ import type { ReactNode } from 'react'
 import type { Quote, Summary } from '@/lib/supabase'
 import { ReaderNav } from './reader/ReaderNav'
 import { QuoteList } from './QuoteList'
-import { LimitedList, SentenceList } from './reader/ReaderPrimitives'
-import { isHeadlineMeta, narrativeHeading, splitHeadline, splitNarrative } from './reader/text'
+import {
+  LimitedList,
+  ReadableText,
+  SentenceList,
+  SectionHeading,
+} from './reader/ReaderPrimitives'
+import {
+  isHeadlineMeta,
+  narrativeHeading,
+  splitHeadline,
+  splitNarrative,
+} from './reader/text'
 
 type Props = { vid: string; summary: Summary | null; channel?: string }
-type ReaderSection = { id: string; title: string; items: ReactNode[] }
-
-export function SummaryCard({ vid, summary, channel }: Props) {
-  if (!summary) return <p className="rounded-xl border border-zinc-800 p-6 text-sm text-zinc-400">아직 요약되지 않았어요.</p>
-
-  if (summary.schema === 'v3') return <SummaryV3Card vid={vid} summary={summary} />
-
-  const row = (title: string, body?: string, speaker?: string | null, quotes?: Quote[], badge?: string, extra?: string, signal = false) => (
-    <ReaderItem vid={vid} title={title} body={body} speaker={speaker} quotes={quotes} badge={badge} extra={extra} signal={signal} />
-  )
-  const sections: ReaderSection[] = [
-    { id: 'verdicts', title: '결론·시그널', items: summary.verdicts?.map(it => row(it.condition, it.consequence, it.speaker, it.quotes, undefined, undefined, true)) ?? [] },
-    { id: 'narrative', title: '영상 흐름', items: summary.narrative ? splitNarrative(summary.narrative).map((step, i) => {
-      const { time, title } = narrativeHeading(step)
-      return <details className="reader-flow">
-        <summary className="flex min-h-11 cursor-pointer items-center gap-3">
-          <span className="shrink-0 font-mono text-xs text-sky-300">{time || String(i + 1).padStart(2, '0')}</span>
-          <span className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">{title}</span>
-          <span aria-hidden="true" className="disclosure-arrow text-zinc-400">⌄</span>
-        </summary>
-        <div className="pb-2 pt-3"><SentenceList text={step} /></div>
-      </details>
-    }) : [] },
-    { id: 'buys', title: '매수', items: summary.buys?.map(it => row(it.ticker, it.reason, it.speaker, it.quotes)) ?? [] },
-    { id: 'sells', title: '매도', items: summary.sells?.map(it => row(it.ticker, it.reason, it.speaker, it.quotes)) ?? [] },
-    { id: 'macro', title: '거시 진단', items: summary.macro_views?.map(it => row(it.topic, it.view, it.speaker, it.quotes)) ?? [] },
-    { id: 'chart', title: '차트 자리', items: summary.chart_levels?.map(it => row(it.ticker, it.reason, it.speaker, it.quotes, undefined, it.level)) ?? [] },
-    { id: 'watchlist', title: '봐야 할 것', items: summary.watchlist?.map(it => row(it.topic, it.reason, it.speaker, it.quotes)) ?? [] },
-    { id: 'lessons', title: '학습 포인트', items: summary.lessons?.map(it => row(it.lesson, undefined, it.speaker, it.quotes, it.type)) ?? [] },
-    { id: 'data', title: '통계·숫자', items: summary.data_points?.map(it => row(it.datum, undefined, undefined, it.quotes)) ?? [] },
-    { id: 'actions', title: '실행 가능', items: summary.action_items?.map(it => row(it.action, undefined, it.speaker, it.quotes)) ?? [] },
-    { id: 'terms', title: '용어', items: summary.terms?.map(it => row(it.term, it.explain, undefined, it.quotes, it.source, it.context)) ?? [] },
-  ].filter(section => section.items.length > 0)
-  const headlines = summary.headline ? splitHeadline(summary.headline) : []
-  const meta = headlines[0] && isHeadlineMeta(headlines[0], channel) ? headlines.shift() : undefined
-  const verdicts = summary.verdicts?.slice(0, 3) ?? []
-  const hasOverview = Boolean(meta || headlines.length || verdicts.length)
-
-  return <div className="summary-body min-w-0">
-    {hasOverview && <section id="overview" aria-labelledby="overview-heading" className="mb-7 scroll-mt-24 border-l-4 border-[var(--accent)] pl-4">
-      <h2 id="overview-heading" className="mb-3 text-lg font-semibold tracking-tight text-[var(--accent)]">핵심 포인트</h2>
-      <div className="max-h-[65svh] overflow-y-auto" role="region" aria-label="핵심 포인트 목록" tabIndex={0}>
-        {meta && <p className="mb-2 text-xs text-zinc-400">{meta}</p>}
-        {headlines.length > 0 && <ul className="list-disc space-y-2 pl-4 text-sm text-zinc-200 marker:text-zinc-500">
-          {headlines.map((point, i) => <li key={i}>{point}</li>)}
-        </ul>}
-        {verdicts.length > 0 && <ul className="mt-3 list-disc space-y-2 pl-4 text-sm text-zinc-300 marker:text-zinc-500">
-          {verdicts.map((verdict, i) => <li key={i}>
-            <span>{verdict.condition}</span>{' '}
-            <span className={verdict.condition.length + verdict.consequence.length > 48 ? 'block' : ''}><span className="font-semibold text-[var(--accent)]">→</span> {verdict.consequence}</span>
-          </li>)}
-        </ul>}
-      </div>
-    </section>}
-
-    {summary.raw_summary && <details className="reader-full-summary mb-7 border-y border-zinc-800">
-      <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-2 text-sm text-zinc-300">
-        전체 요약 읽기
-        <span aria-hidden="true" className="disclosure-arrow text-zinc-400">⌄</span>
-      </summary>
-      <div className="py-3"><SentenceList text={summary.raw_summary} /></div>
-    </details>}
-
-    {sections.length > 0 && <>
-      <ReaderNav sections={[
-        ...(hasOverview ? [{ id: 'overview', title: '핵심 포인트' }] : []),
-        ...sections.map(({ id, title }) => ({ id, title })),
-      ]} />
-      <div className="space-y-9">
-        {sections.map(section => <section key={section.id} id={section.id} aria-labelledby={`${section.id}-heading`} className="scroll-mt-24">
-          <div className="mb-2 flex items-baseline gap-2 border-b border-zinc-700 pb-3">
-            <h2 id={`${section.id}-heading`} className="text-lg font-semibold tracking-tight">{section.title}</h2>
-            <span className="rounded bg-zinc-800 px-1.5 py-0.5 text-xs tabular-nums text-[var(--accent)]">{section.items.length}</span>
-          </div>
-          <LimitedList items={section.items} label={section.title} />
-        </section>)}
-      </div>
-    </>}
-  </div>
+type ReaderSection = {
+  id: string
+  title: string
+  nav: string
+  description: string
+  items: ReactNode[]
+}
+const lessonTypes: Record<string, string> = {
+  rule: '기억할 원칙',
+  counter: '다른 관점',
+  reference: '참고할 내용',
+  analogy: '이해를 돕는 비유',
 }
 
-function ReaderItem({ vid, title, body, speaker, quotes, badge, extra, signal = false }: {
-  vid: string; title: string; body?: string; speaker?: string | null; quotes?: Quote[]; badge?: string; extra?: string; signal?: boolean
-}) {
-  return <div className="min-w-0">
-    <details className="reader-item">
-      <summary className="min-h-11 cursor-pointer py-1">
-        <span className="flex min-w-0 items-center gap-2">
-          {signal && <span className="shrink-0 text-xs font-medium text-[var(--accent)]">조건</span>}
-          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-zinc-100">{title}</span>
-          {badge && <span className="shrink-0 rounded border border-zinc-700 px-1.5 py-0.5 text-xs font-normal text-zinc-300">{badge}</span>}
-          <span aria-hidden="true" className="disclosure-arrow shrink-0 text-zinc-400">⌄</span>
-        </span>
-        {speaker && <span className="block truncate text-xs text-zinc-400">{speaker}</span>}
-        {(body || extra) && <span className="reader-preview mt-1 line-clamp-2 text-sm text-zinc-300">{signal && <span className="font-semibold text-[var(--accent)]">→ </span>}{[body, extra].filter(Boolean).join(' · ')}</span>}
-      </summary>
-      <div className="space-y-3 py-3">
-        <SentenceList text={title} />
-        {speaker && <p className="text-xs text-zinc-400">{speaker}</p>}
-        {body && <SentenceList text={body} />}
-        {extra && <SentenceList text={extra} />}
+export function SummaryCard({ vid, summary, channel }: Props) {
+  if (!summary)
+    return (
+      <div className="empty-state">
+        <h2>요약을 준비하고 있어요</h2>
+        <p>다른 영상의 요약을 먼저 읽어보세요.</p>
       </div>
-    </details>
-    <QuoteList vid={vid} quotes={quotes} />
-  </div>
+    )
+  if (summary.schema === 'v3')
+    return <SummaryV3Card vid={vid} summary={summary} />
+  const row = (
+    title: string,
+    body?: string,
+    speaker?: string | null,
+    quotes?: Quote[],
+    badge?: string,
+    extra?: string,
+    tone = '',
+  ) => (
+    <ReaderItem
+      vid={vid}
+      title={title}
+      body={body}
+      speaker={speaker}
+      quotes={quotes}
+      badge={badge}
+      extra={extra}
+      tone={tone}
+    />
+  )
+  const sections: ReaderSection[] = [
+    {
+      id: 'buys',
+      title: '매수한다고 말한 것',
+      nav: '매수 발언',
+      description: '출연자가 밝힌 대상과 이유예요.',
+      items:
+        summary.buys?.map((it) =>
+          row(
+            it.ticker,
+            it.reason,
+            it.speaker,
+            it.quotes,
+            '매수',
+            undefined,
+            'buy',
+          ),
+        ) ?? [],
+    },
+    {
+      id: 'sells',
+      title: '매도한다고 말한 것',
+      nav: '매도 발언',
+      description: '어떤 이유로 줄이거나 팔았는지 확인해요.',
+      items:
+        summary.sells?.map((it) =>
+          row(
+            it.ticker,
+            it.reason,
+            it.speaker,
+            it.quotes,
+            '매도',
+            undefined,
+            'sell',
+          ),
+        ) ?? [],
+    },
+    {
+      id: 'verdicts',
+      title: '어떤 변화에 주목할까',
+      nav: '관전 포인트',
+      description: '출연자의 판단과 그 판단이 성립하는 조건.',
+      items:
+        summary.verdicts?.map((it) =>
+          row(
+            it.condition,
+            it.consequence,
+            it.speaker,
+            it.quotes,
+            '조건과 예상',
+          ),
+        ) ?? [],
+    },
+    {
+      id: 'macro',
+      title: '시장을 보는 큰 그림',
+      nav: '시장 흐름',
+      description: '금리·환율·경기 이야기를 연결해 읽어요.',
+      items:
+        summary.macro_views?.map((it) =>
+          row(it.topic, it.view, it.speaker, it.quotes),
+        ) ?? [],
+    },
+    {
+      id: 'terms',
+      title: '경제 용어, 여기서 이해하기',
+      nav: '경제 용어',
+      description: '낯선 말은 뜻과 맥락을 함께 확인해요.',
+      items:
+        summary.terms?.map((it, i) => (
+          <div key={i} className="term-card">
+            <span className="term-index">{String(i + 1).padStart(2, '0')}</span>
+            <div>
+              <h3>{it.term}</h3>
+              <ReadableText text={it.explain} />
+              {it.context && (
+                <div className="term-context">
+                  <span>영상 속 맥락</span>
+                  <ReadableText text={it.context} />
+                </div>
+              )}
+              {it.source && <span className="source-label">{it.source}</span>}
+              <QuoteList vid={vid} quotes={it.quotes} />
+            </div>
+          </div>
+        )) ?? [],
+    },
+    {
+      id: 'lessons',
+      title: '다음에도 써먹을 경제 지식',
+      nav: '배울 점',
+      description: '한 번의 시황을 넘어 기억할 이야기.',
+      items:
+        summary.lessons?.map((it) =>
+          row(
+            it.lesson,
+            undefined,
+            it.speaker,
+            it.quotes,
+            lessonTypes[it.type] ?? it.type,
+          ),
+        ) ?? [],
+    },
+    {
+      id: 'watchlist',
+      title: '앞으로 지켜볼 것',
+      nav: '지켜볼 것',
+      description: '방송에서 주목한 이슈와 다음 확인 지점.',
+      items:
+        summary.watchlist?.map((it) =>
+          row(it.topic, it.reason, it.speaker, it.quotes),
+        ) ?? [],
+    },
+    {
+      id: 'chart',
+      title: '차트에서 짚은 구간',
+      nav: '가격 구간',
+      description: '방송 시점의 가격 구간과 해석이에요.',
+      items:
+        summary.chart_levels?.map((it) =>
+          row(it.ticker, it.reason, it.speaker, it.quotes, undefined, it.level),
+        ) ?? [],
+    },
+    {
+      id: 'data',
+      title: '숫자로 짚어보기',
+      nav: '주요 숫자',
+      description: '방송에서 언급한 수치와 근거.',
+      items:
+        summary.data_points?.map((it) =>
+          row(it.datum, undefined, undefined, it.quotes),
+        ) ?? [],
+    },
+    {
+      id: 'actions',
+      title: '출연자가 제안한 행동',
+      nav: '행동 제안',
+      description: '발언자의 의견과 그 근거를 함께 읽어요.',
+      items:
+        summary.action_items?.map((it) =>
+          row(it.action, undefined, it.speaker, it.quotes),
+        ) ?? [],
+    },
+    {
+      id: 'narrative',
+      title: '영상 흐름 따라가기',
+      nav: '영상 목차',
+      description: '어떤 순서로 이야기가 이어졌는지 확인해요.',
+      items: summary.narrative
+        ? splitNarrative(summary.narrative).map((step, i) => {
+            const { time, title } = narrativeHeading(step)
+            return (
+              <details key={i} className="reader-flow">
+                <summary>
+                  <span className="chapter-time">
+                    {time || String(i + 1).padStart(2, '0')}
+                  </span>
+                  <span>{title}</span>
+                  <span aria-hidden="true" className="disclosure-arrow">
+                    ⌄
+                  </span>
+                </summary>
+                <SentenceList text={step} />
+              </details>
+            )
+          })
+        : [],
+    },
+  ].filter((s) => s.items.length > 0)
+  const headlines = summary.headline ? splitHeadline(summary.headline) : []
+  const meta =
+    headlines[0] && isHeadlineMeta(headlines[0], channel)
+      ? headlines.shift()
+      : undefined
+  const verdicts = summary.verdicts?.slice(0, 3) ?? []
+  const hasOverview = Boolean(meta || headlines.length || verdicts.length)
+  return (
+    <div className="summary-body">
+      {hasOverview && (
+        <section
+          id="overview"
+          aria-labelledby="overview-heading"
+          className="overview-card"
+        >
+          <p className="eyebrow">THE BRIEF</p>
+          <h2 id="overview-heading">먼저, 한눈에</h2>
+          {meta && <p className="source-label">{meta}</p>}
+          {headlines.length > 0 ? (
+            <ul className="overview-points">
+              {headlines.map((p, i) => (
+                <li key={i}>
+                  <ReadableText text={p} limit={220} />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="overview-points">
+              {verdicts.map((v, i) => (
+                <li key={i}>
+                  <ReadableText text={`${v.condition} → ${v.consequence}`} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+      {summary.raw_summary && (
+        <details className="reader-full-summary">
+          <summary>
+            전체 요약 읽기{' '}
+            <span aria-hidden="true" className="disclosure-arrow">
+              ⌄
+            </span>
+          </summary>
+          <SentenceList text={summary.raw_summary} />
+        </details>
+      )}
+      {sections.length > 0 && (
+        <>
+          <ReaderNav
+            sections={[
+              ...(hasOverview ? [{ id: 'overview', title: '한눈에' }] : []),
+              ...sections.map((s) => ({ id: s.id, title: s.nav })),
+            ]}
+          />
+          <div className="reader-sections">
+            {sections.map((s) => (
+              <section
+                key={s.id}
+                id={s.id}
+                aria-labelledby={`${s.id}-heading`}
+                className={`reader-section section-${s.id}`}
+              >
+                <SectionHeading
+                  id={s.id}
+                  title={s.title}
+                  count={s.items.length}
+                  description={s.description}
+                />
+                <LimitedList items={s.items} label={s.title} />
+              </section>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function ReaderItem({
+  vid,
+  title,
+  body,
+  speaker,
+  quotes,
+  badge,
+  extra,
+  tone,
+}: {
+  vid: string
+  title: string
+  body?: string
+  speaker?: string | null
+  quotes?: Quote[]
+  badge?: string
+  extra?: string
+  tone?: string
+}) {
+  return (
+    <div className={`insight-card ${tone ? `tone-${tone}` : ''}`}>
+      {badge && (
+        <span className={tone ? `signal signal-${tone}` : 'small-label'}>
+          {badge}
+        </span>
+      )}
+      <h3>{title}</h3>
+      {speaker && <p className="speaker-label">발언 · {speaker}</p>}
+      {body && <ReadableText text={body} />}{' '}
+      {extra && (
+        <div className="condition-box">
+          <ReadableText text={extra} />
+        </div>
+      )}
+      <QuoteList vid={vid} quotes={quotes} />
+    </div>
+  )
 }

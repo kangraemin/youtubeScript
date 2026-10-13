@@ -95,7 +95,7 @@ function RouteProgressInner() {
       style={{ opacity: visible ? 1 : 0, transition: 'opacity 200ms' }}
     >
       <div
-        className="h-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.7)]"
+        className="h-full bg-[var(--accent)]"
         style={{ width: `${progress}%`, transition: 'width 200ms ease-out' }}
       />
     </div>

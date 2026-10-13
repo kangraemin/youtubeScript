@@ -1,19 +1,18 @@
 export default function Loading() {
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-      <div className="h-8 w-44 bg-zinc-800/60 rounded animate-pulse mb-8" />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div
-            key={i}
-            className="rounded-xl border border-zinc-800 bg-zinc-900/40 overflow-hidden"
-          >
-            <div className="aspect-video bg-zinc-800/60 animate-pulse" />
-            <div className="p-3 space-y-2">
-              <div className="h-4 bg-zinc-800/60 rounded animate-pulse" />
-              <div className="h-3 w-2/3 bg-zinc-800/40 rounded animate-pulse" />
-              <div className="h-3 w-1/3 bg-zinc-800/30 rounded animate-pulse" />
-            </div>
+    <main
+      className="page-shell"
+      aria-busy="true"
+      aria-label="요약을 불러오는 중"
+    >
+      <div className="skeleton skeleton-title" />
+      <div className="feed-grid">
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="skeleton-card">
+            <div className="skeleton skeleton-label" />
+            <div className="skeleton skeleton-line" />
+            <div className="skeleton skeleton-line" />
+            <div className="skeleton skeleton-label" />
           </div>
         ))}
       </div>

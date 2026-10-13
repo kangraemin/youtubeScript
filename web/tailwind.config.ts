@@ -9,13 +9,13 @@ const config: Config = {
     extend: {
       colors: {
         bg: {
-          DEFAULT: '#0e0f12',
-          card: '#14161b',
-          soft: '#1a1d24',
+          DEFAULT: '#f6f7f3',
+          card: '#ffffff',
+          soft: '#edf2ec',
         },
         border: {
-          DEFAULT: '#2a2e38',
-          soft: '#1f232c',
+          DEFAULT: '#d8dfd8',
+          soft: '#e6ebe5',
         },
       },
     },

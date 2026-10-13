@@ -14,15 +14,17 @@ export default async function VideoPage({
   const { vid } = await params
   const { data } = await supabase
     .from('transcripts')
-    .select('vid,channel,channel_slug,title,published_at,url,summary,summarized_at')
+    .select(
+      'vid,channel,channel_slug,title,published_at,url,summary,summarized_at',
+    )
     .eq('vid', vid)
     .single()
 
   const t = data as Transcript | null
   if (!t) {
     return (
-      <main className="max-w-3xl mx-auto px-5 py-8">
-        <Link href="/" className="inline-flex min-h-11 min-w-11 items-center text-sm text-zinc-400 hover:text-zinc-200">
+      <main className="reader-shell">
+        <Link href="/" className="back-link">
           ← 홈
         </Link>
         <p className="text-zinc-400 mt-4">영상을 찾을 수 없어요.</p>
@@ -33,29 +35,46 @@ export default async function VideoPage({
   const ch = getChannelMeta(t.channel_slug, t.channel)
 
   return (
-    <main className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-      <Link href={`/channel/${t.channel_slug}`} className="inline-flex min-h-11 min-w-11 items-center text-sm text-zinc-400 hover:text-zinc-200">
+    <main className="reader-shell">
+      <Link href={`/channel/${t.channel_slug}`} className="back-link">
         ← {ch.name}
       </Link>
 
       <article className="mt-5">
-        <header className="border-b border-zinc-800 pb-6">
-          <p className="mb-3 text-xs font-medium tracking-widest text-zinc-400">영상 요약</p>
-          <h1 className="text-2xl font-bold leading-snug tracking-tight sm:text-3xl">{t.title}</h1>
-          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
-            <span className="font-medium text-zinc-200">{ch.name}</span>
-            {t.published_at && <time dateTime={t.published_at}>{t.published_at.slice(0, 10)}</time>}
-            {t.summarized_at && <span>{t.summarized_at.slice(0, 10)} 요약</span>}
-            <a href={t.url || watchUrl(t.vid)} target="_blank" rel="noreferrer"
-              className="inline-flex min-h-11 items-center text-sky-300 hover:underline sm:ml-auto">
-              YouTube 원본 보기 <span aria-hidden="true" className="ml-1">↗</span>
+        <header className="video-heading">
+          <p className="eyebrow">영상 요약</p>
+          <h1 className="detail-title">{t.title}</h1>
+          <div className="detail-meta">
+            <span className="detail-channel">{ch.name}</span>
+            {t.published_at && (
+              <time dateTime={t.published_at}>
+                {t.published_at.slice(0, 10)}
+              </time>
+            )}
+            {t.summarized_at && (
+              <span>{t.summarized_at.slice(0, 10)} 요약</span>
+            )}
+            <a
+              href={t.url || watchUrl(t.vid)}
+              target="_blank"
+              rel="noreferrer"
+              className="original-link"
+            >
+              YouTube 원본 보기{' '}
+              <span aria-hidden="true" className="ml-1">
+                ↗
+              </span>
             </a>
           </div>
         </header>
       </article>
 
-      <div className="mt-8">
-        <SummaryCard vid={t.vid} summary={t.summary ?? null} channel={t.channel} />
+      <div className="detail-summary">
+        <SummaryCard
+          vid={t.vid}
+          summary={t.summary ?? null}
+          channel={t.channel}
+        />
       </div>
     </main>
   )

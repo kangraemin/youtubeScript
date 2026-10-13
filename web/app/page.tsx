@@ -26,7 +26,10 @@ async function fetchChannelStats(): Promise<ChannelStat[]> {
     count_summarized: number
     latest_published_at: string | null
   }[]) {
-    agg.set(r.channel_slug, { count: r.count_summarized, latest: r.latest_published_at })
+    agg.set(r.channel_slug, {
+      count: r.count_summarized,
+      latest: r.latest_published_at,
+    })
   }
 
   // 요약 0건 채널은 숨긴다. 카드를 눌러도 빈 목록만 나와서 헛걸음이 된다
@@ -66,51 +69,44 @@ export default async function HomePage() {
   ])
 
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-      <header className="mb-6 border-b border-zinc-800 pb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
-          주식·경제 다이제스트
+    <main className="page-shell">
+      <header className="home-intro">
+        <p className="eyebrow">YOUR DAILY ECONOMY</p>
+        <h1>
+          긴 영상 속 핵심을,
+          <br />
+          <span>내가 읽는 속도로.</span>
         </h1>
-        {/* 채널 수는 하드코딩하면 채널이 늘 때마다 어긋난다(실제 11개인데 "7개"로 방치됐었다).
-            갱신 주기도 revalidate 상수에서 직접 뽑아 문구와 동작이 갈라지지 않게 한다. */}
-        <p className="text-sm leading-relaxed text-zinc-400 mt-3">
-          {STOCK_ECON_SLUGS.length}개 채널 영상의 매수·매도·관전 포인트를 한 곳에 모아봅니다 ·{' '}
-          {revalidate / 3600}시간마다 갱신
+        <p>
+          {channelStats.length}개 경제 채널의 이야기. 매매 발언부터 경제
+          개념까지.
         </p>
       </header>
-
-      {/* 채널은 가로 스크롤 칩 한 줄. 예전엔 통계 카드 그리드가 모바일 첫 화면을 통째로 차지해
-          요약이 1.4화면 아래에서야 보였다(2026-10-05 실측, 첫 카드 y=1,222 / 화면 844). */}
-      {/* 2026-10-07: 칩이 2줄(이름+최근 업로드)로 커서 모바일 첫 화면에 2개만 화면 폭을 꽉 채웠고,
-          스크롤 단서가 없어 "채널이 2개뿐"으로 보였다. 칩을 한 줄로 줄이고 오른쪽에 페이드를 둬
-          뒤에 더 있다는 걸 보이게 한다. 최근 업로드 날짜는 title(툴팁)로만 남긴다. */}
-      <div className="relative -mx-4 sm:mx-0 mb-5">
-        <nav aria-label={`채널 ${channelStats.length}개`} className="overflow-x-auto">
-          <ul className="flex gap-2 px-4 sm:px-0 sm:flex-wrap w-max sm:w-auto">
-            {channelStats.map((s) => {
-              const ch = getChannelMeta(s.slug)
-              return (
-                <li key={s.slug}>
-                  <Link
-                    href={`/channel/${s.slug}`}
-                    title={s.latest_published_at ? `최근 업로드 ${s.latest_published_at.slice(0, 10)}` : undefined}
-                    className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-full border border-zinc-800 bg-zinc-900/60 px-3.5 text-sm text-zinc-200 hover:border-zinc-600"
-                  >
-                    <span className="font-medium">{ch.name}</span>
-                    <span className="text-xs tabular-nums text-zinc-400">{s.count_summarized}</span>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </nav>
-        <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-bg to-transparent sm:hidden" />
-      </div>
-
-      <section>
-        <h2 className="sr-only">최신 요약</h2>
+      <nav className="channel-nav" aria-label={`채널 ${channelStats.length}개`}>
+        <Link href="/" className="channel-chip is-active" aria-current="page">
+          전체 채널
+        </Link>
+        {channelStats.map((s) => (
+          <Link
+            key={s.slug}
+            href={`/channel/${s.slug}`}
+            className="channel-chip"
+          >
+            {getChannelMeta(s.slug).name}
+            <span>{s.count_summarized}</span>
+          </Link>
+        ))}
+      </nav>
+      <section aria-labelledby="feed-heading">
+        <div className="feed-heading">
+          <h2 id="feed-heading">지금 읽을 경제 이야기</h2>
+          <span>{revalidate / 3600}시간마다 갱신</span>
+        </div>
         <SearchableFeed initialItems={initialFeed} />
       </section>
+      <footer className="site-footer">
+        경제 다이제스트 · 영상의 발언과 맥락을 함께 읽어요.
+      </footer>
     </main>
   )
 }
