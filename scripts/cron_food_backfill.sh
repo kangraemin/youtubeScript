@@ -27,7 +27,7 @@ FOOD="dulcinea_studio,tzuyang,jaesunrang,kimjjamppong,kimsawon,heebab,sungsikyun
 
 echo "[$(date '+%F %T')] 시작" >> "$LOG"
 OUT=$(.venv/bin/python scripts/crawl_youtube_transcripts.py --channel "$FOOD" --days 2190 \
-  --crawl-cap 5 --headless --workers 1 --max-minutes 25 2>&1)
+  --crawl-cap "${FOOD_CAP:-5}" --headless --workers 1 --max-minutes "${FOOD_MAX_MINUTES:-25}" 2>&1)
 echo "$OUT" >> "$LOG"
 if echo "$OUT" | grep -q "^BACKFILL COMPLETE"; then
   date '+%F %T' > "$DONE"
