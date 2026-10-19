@@ -95,24 +95,42 @@ def _search_candidates(query: str) -> list[dict]:
         return []
 
 
-def _pick_best(items: list[dict], regions: list[str]) -> tuple[dict | None, int]:
-    """후보 중 hint 지역 키워드가 주소에 많이 들어간 것을 고른다. (후보, 지역 점수)를 돌려준다.
+def _admin_stems(address: str) -> list[str]:
+    """주소의 시·군·구·읍·면 이름에서 끝 글자를 뗀 줄기(2자 이상). "충청북도 단양군 가곡면" → ["단양", "가곡"]."""
+    stems = []
+    for w in address.split():
+        m = re.fullmatch(r"([가-힣]{2,})(시|군|구|읍|면)", w)
+        if m and "특별" not in m.group(1) and "광역" not in m.group(1):
+            stems.append(m.group(1))
+    return stems
 
-    regions가 비어있으면 첫 결과(점수 0).
-    모든 후보가 지역 불일치면 (None, 0) (false positive 방지).
+
+def _region_score(addr: str, regions: list[str], hint: str) -> int:
+    """hint 지역 키워드 수 + 주소의 시·군·구 이름이 hint에 나온 수."""
+    score = sum(1 for kw in regions if kw in addr)
+    if hint:
+        score += sum(1 for st in _admin_stems(addr) if st in hint and st not in regions)
+    return score
+
+
+def _pick_best(items: list[dict], regions: list[str], hint: str = "") -> tuple[dict | None, int]:
+    """후보 중 hint 지역이 주소에 많이 들어간 것을 고른다. (후보, 지역 점수)를 돌려준다.
+
+    hint에 지역 단서가 없으면 첫 결과(점수 0).
+    지역 단서가 있는데 모든 후보가 불일치면 (None, 0) (false positive 방지).
+    REGION_KEYWORDS에 없는 시·군(고흥·단양 등)은 주소의 행정구역 이름이 hint에 있는지로 맞춘다.
     """
     if not items:
         return None, 0
-    if not regions:
-        return items[0], 0
     scored = []
     for it in items:
         addr = it.get("roadAddress") or it.get("address", "")
-        score = sum(1 for kw in regions if kw in addr)
-        scored.append((score, it))
+        scored.append((_region_score(addr, regions, hint or ""), it))
     scored.sort(key=lambda x: -x[0])
     top_score, top_item = scored[0]
-    return (top_item, top_score) if top_score > 0 else (None, 0)
+    if top_score > 0:
+        return top_item, top_score
+    return (items[0], 0) if not regions else (None, 0)
 
 
 def _norm_name(s: str) -> str:
@@ -149,7 +167,7 @@ def search_restaurant(name: str, address_hint: str = "") -> dict | None:
 
     for query in queries:
         items = _search_candidates(query)
-        item, region_score = _pick_best(items, regions)
+        item, region_score = _pick_best(items, regions, address_hint)
         if not item:
             continue
         try:
