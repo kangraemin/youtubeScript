@@ -89,6 +89,9 @@ def _queue_state(db) -> dict[str, dict]:
     return {r["video_id"]: r for r in rows}
 
 
+VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+
+
 def candidates(db, max_videos: int) -> list[dict]:
     dates = _published_dates()
     state = _queue_state(db) if db else {}
@@ -96,6 +99,8 @@ def candidates(db, max_videos: int) -> list[dict]:
     for ch in food_channels():
         for f in (TRANSCRIPTS / ch["slug"]).glob("*.txt"):
             vid = f.stem
+            if not VIDEO_ID.match(vid):  # _no_transcript.txt 같은 표시용 파일
+                continue
             q = state.get(vid)
             if q and q.get("prompt_version") == PROMPT_VERSION:
                 if q["status"] in FINISHED or (q.get("retry_count") or 0) >= MAX_RETRY:
