@@ -21,6 +21,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 
@@ -334,7 +335,20 @@ def main():
             logger.info("회차 상한 도달 — 남은 영상은 다음 회차로")
             break
         try:
-            results[v["video_id"]] = process_video(db, v, stats)
+            for attempt in range(3):
+                try:
+                    results[v["video_id"]] = process_video(db, v, stats)
+                    break
+                except httpx.TransportError as e:
+                    # Supabase HTTP/2 연결이 가끔 SSL 오류(bad record mac)로 끊긴다 — 연결을 새로 열고 같은 영상을 다시 한다
+                    logger.warning("DB 연결 오류(%d/3): %s — %s", attempt + 1, v["video_id"], e)
+                    time.sleep(5 * (attempt + 1))
+                    db_read = get_client()
+                    db = None if args.dry_run else db_read
+            else:
+                logger.error("DB 연결 오류 3회 — 이 영상은 건너뛰고 다음 회차에 다시 한다: %s", v["video_id"])
+                stats["failed"] += 1
+                continue
         except ExtractBlocked as e:
             # 로그인 만료·한도 초과는 다음 영상도 똑같이 실패한다. 큐는 그대로 두고 다음 회차에 다시 한다
             logger.error("추출 중단(이번 회차 종료): %s", e)
