@@ -24,6 +24,8 @@ fi
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
 # cron엔 계정 경로가 없어 기본 계정(~/.claude)으로 돈다 — 그 계정은 로그인 만료·주간 한도로 전부 실패했다(2026-10-19)
 export CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-/Users/ram/.config/claude-accounts/personal}"
+# 로그인 토큰은 키체인에 있고 USER로 찾는다. cron엔 USER가 없어 "Not logged in"으로 전부 실패했다(2026-10-20)
+export USER="${USER:-$(id -un)}"
 
 echo "[$(date '+%F %T')] 시작" >> "$LOG"
 .venv/bin/python worker/pipeline.py --max-videos "${MUKMAP_MAX_VIDEOS:-10}" --max-minutes "${MUKMAP_MAX_MINUTES:-50}" >> "$LOG" 2>&1
