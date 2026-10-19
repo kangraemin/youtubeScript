@@ -16,7 +16,7 @@ from chain_blacklist import CHAIN_NAMES
 logger = logging.getLogger(__name__)
 
 # 프롬프트나 스키마를 바꾸면 올린다. processing_queue.prompt_version이 다르면 다시 처리 대상이 된다.
-PROMPT_VERSION = "v2-2026-10-19"
+PROMPT_VERSION = "v3-2026-10-20"
 CLAUDE = os.path.expanduser("~/.local/bin/claude")
 MODEL = os.environ.get("EXTRACT_MODEL", "sonnet")
 # 기본 지시문·도구·설정을 빼면 호출당 고정 비용이 4만 5천 → 600토큰으로 준다(--bare는 API 키 인증이라 안 씀)
@@ -65,7 +65,7 @@ _PROMPT_BODY = """다음은 유튜브 영상의 제목, 설명, 자막입니다.
 {transcript}
 
 다음 JSON 형식으로만 응답하세요 (다른 텍스트 없이):
-{{"restaurants": [{{"name": "가게명", "address_hint": "구체적 지역", "category": "카테고리", "rating": "평가", "summary": "한줄평", "is_ad": false, "timestamp_seconds": 0, "visited": true, "menu": "먹은 메뉴와 양", "price": "영상에서 말한 가격", "quote": "유튜버 발언 원문", "why": "추천 이유 또는 아쉬운 점"}}]}}
+{{"restaurants": [{{"name": "가게명", "address_hint": "구체적 지역", "category": "카테고리", "rating": "평가", "summary": "한줄평", "is_ad": false, "timestamp_seconds": 0, "visited": true, "menu": "먹은 메뉴와 양", "price": "영상에서 말한 가격", "quote": "유튜버 발언 원문", "why": "추천 이유 또는 아쉬운 점", "detail": {{"recommend": "강추|추천|보통|아쉬움", "verdict": "총평", "dishes": [{{"name": "메뉴", "comment": "맛 평가", "best": true, "ts": "MM:SS"}}], "pros": ["좋다고 한 점"], "cons": ["아쉽다고 한 점"], "price": "대표 가격", "wait": "웨이팅", "hours": "영업시간·휴무", "parking": "주차", "reserve": "예약", "solo_ok": "혼밥", "taste": "맛 특징", "portion": "양", "spicy_salty": "맵기·간", "vibe": "분위기", "service": "친절", "revisit": "재방문", "good_for": "어울리는 자리", "value": "가성비", "tips": ["방문 팁"]}}}}]}}
 
 규칙:
 - **실제 방문하여 먹는 장면이 있는 경우만** 추출. 단순 언급/경품/이벤트/회의는 제외
@@ -88,6 +88,14 @@ _PROMPT_BODY = """다음은 유튜브 영상의 제목, 설명, 자막입니다.
 - price: 영상에서 말한 가격만 (예: "육전 1인분 15,000원"). 말하지 않았으면 "" — 추측 금지
 - quote: 그 가게 음식에 대한 유튜버의 말을 **자막에 적힌 그대로** 1~2문장(80자 이내) 복사. 고치거나 지어내지 말 것. 적당한 말이 없으면 ""
 - why: 추천 이유 또는 아쉬운 점 한 문장 (30자 이내)
+- detail: 그 가게에 대해 **유튜버가 실제로 한 말만** 근거로 채운다. 말하지 않은 항목은 "" 또는 [] — 추측·일반론 금지
+  - recommend: 강추=극찬·재방문/강력 추천 발언, 추천=맛있다는 반응 위주, 보통=무난·호불호, 아쉬움=단점 위주
+  - verdict: 유튜버 총평 한 문장(40자 이내)
+  - dishes: 이 영상에서 **실제로 먹은** 메뉴만(말만 하고 안 먹은 것 제외), 최대 5개. comment는 맛 평가 30자 이내, 가장 맛있다고 한 메뉴 하나만 best=true, ts는 그 메뉴를 먹는 자막 시각
+  - pros / cons: 각 최대 4개, 항목당 20자 이내. 메뉴 comment와 같은 말 반복 금지
+  - price·wait·hours·parking·reserve·solo_ok: 화면 칩에 들어가므로 **20자 이내로 짧게**. price는 숫자와 "원"이 있는 대표 메뉴 가격 하나(예: "피자 L 29,000원"), 숫자 없으면 "". wait는 유튜버가 실제로 기다린 정도(예: "2시간 가까이", "20~25분", "바로 입장", "오픈 전 12팀")
+  - taste: 맛 키워드 3개 이내(예: "짭짤, 불맛"). portion·spicy_salty·vibe·service·revisit·good_for·value: 각 40자 이내
+  - tips: 주문 팁·먹는 법 등 최대 3개, 항목당 40자 이내
 - 맛집 영상이 아닌 경우(노래, 브이로그, 회의, 이벤트 홍보 등) 빈 배열 반환
 - 가게가 없으면 빈 배열: {{"restaurants": []}}
 - JSON만 응답"""
@@ -112,6 +120,43 @@ def verify_quote(quote: str, transcript_text: str) -> str:
     if len(q) < 4:
         return ""
     return quote.strip() if q in _squash(transcript_text) else ""
+
+
+DETAIL_TEXT = {"recommend": 6, "verdict": 40, "price": 20, "wait": 20, "hours": 20, "parking": 20, "reserve": 20,
+               "solo_ok": 20, "taste": 30, "portion": 40, "spicy_salty": 40, "vibe": 40, "service": 40,
+               "revisit": 40, "good_for": 40, "value": 40}
+DETAIL_LIST = {"pros": (4, 20), "cons": (4, 20), "tips": (3, 40)}
+RECOMMEND = {"강추", "추천", "보통", "아쉬움"}
+_NONE = re.compile(r"^(없음|언급\s*없음|미언급|해당\s*없음|정보\s*없음|-|n/?a)$", re.I)
+
+
+def _txt(v, n: int) -> str:
+    s = re.sub(r"\s+", " ", str(v or "")).strip()
+    if not s or _NONE.match(s):
+        return ""
+    return s if len(s) <= n else s[: n - 1] + "…"
+
+
+def clean_detail(d) -> dict | None:
+    """상세 요약을 화면 규칙(빈말 제거·길이·개수 상한)에 맞게 다듬는다. 남는 게 없으면 None."""
+    if not isinstance(d, dict):
+        return None
+    out: dict = {k: _txt(d.get(k), n) for k, n in DETAIL_TEXT.items()}
+    if out["recommend"] not in RECOMMEND:
+        out["recommend"] = ""
+    if out["price"] and not re.search(r"\d", out["price"]):
+        out["price"] = ""
+    for k, (cnt, n) in DETAIL_LIST.items():
+        xs = d.get(k) if isinstance(d.get(k), list) else []
+        out[k] = [t for t in (_txt(x, n) for x in xs) if t][:cnt]
+    dishes = []
+    for x in d.get("dishes") if isinstance(d.get("dishes"), list) else []:
+        if isinstance(x, dict) and _txt(x.get("name"), 30):
+            dishes.append({"name": _txt(x.get("name"), 30), "comment": _txt(x.get("comment"), 30),
+                           "best": bool(x.get("best")), "ts": _txt(x.get("ts"), 8)})
+    out["dishes"] = sorted(dishes, key=lambda x: not x["best"])[:5]
+    out = {k: v for k, v in out.items() if v}
+    return out or None
 
 
 def _run_claude(prompt: str) -> tuple[str, dict]:
@@ -207,5 +252,6 @@ def extract_restaurants(
         rest["quote"] = verify_quote(rest.get("quote", ""), plain_text)
         for k in ("menu", "price", "why"):
             rest[k] = (rest.get(k) or "").strip()
+        rest["detail"] = clean_detail(rest.get("detail"))
         out.append(rest)
     return out, usage

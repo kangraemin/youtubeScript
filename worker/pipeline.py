@@ -177,6 +177,7 @@ def _video_row(video: dict, rest_id: int, rest: dict) -> dict:
         "price": rest.get("price") or None,
         "quote": rest.get("quote") or None,
         "why": rest.get("why") or None,
+        "detail": rest.get("detail"),
     }
 
 
@@ -195,7 +196,7 @@ def _save(db, video: dict, place: dict, rest: dict, confident: bool, out: list):
         "needs_review": not confident,
         "is_visible": confident,
     }
-    out.append({**row, "menu": rest.get("menu"), "price": rest.get("price"), "quote": rest.get("quote")})
+    out.append({**row, "menu": rest.get("menu"), "price": rest.get("price"), "quote": rest.get("quote"), "detail": rest.get("detail")})
     if db is None:
         return
     from supabase_client import upsert_restaurant, upsert_video
