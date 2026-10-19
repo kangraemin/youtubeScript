@@ -1,5 +1,6 @@
 #!/bin/bash
-# MukMap 맛집 파이프라인 — 매시 :20. 자막 → claude -p 추출 → 네이버 매칭 → Supabase.
+# MukMap 맛집 파이프라인 — 매시 :20. 자막 → claude -p 추출(막히면 codex exec) → 네이버 매칭 → Supabase.
+# 쌓인 자막을 한 번에 비울 땐 MUKMAP_MAX_VIDEOS/MUKMAP_MAX_MINUTES로 회차 크기를 키운다(scripts/drain_mukmap.sh).
 # 구독 한도를 아끼려고 회차당 10개만 처리한다(사용자 지시 2026-10-19). 6년치 백필은 2~3주에 걸쳐 따라간다.
 # 하루 첫 회차에는 어제 리포트를 만든다.
 SELF="/Users/ram/programming/vibecoding/youtubeScript/scripts/cron_mukmap.sh"
@@ -25,7 +26,7 @@ export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
 export CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-/Users/ram/.config/claude-accounts/personal}"
 
 echo "[$(date '+%F %T')] 시작" >> "$LOG"
-.venv/bin/python worker/pipeline.py --max-videos 10 --max-minutes 50 >> "$LOG" 2>&1
+.venv/bin/python worker/pipeline.py --max-videos "${MUKMAP_MAX_VIDEOS:-10}" --max-minutes "${MUKMAP_MAX_MINUTES:-50}" >> "$LOG" 2>&1
 
 YESTERDAY=$(date -v-1d '+%F')
 if [ ! -f "rawdata/reports/daily-$YESTERDAY.md" ]; then
