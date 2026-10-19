@@ -10,6 +10,8 @@
 4. 요약 대상이면 SUMMARY_SLUGS 합집합에 추가
 """
 
+import re
+
 # 주식·경제 채널 (요약 대상, 쇼츠 필터 없음)
 STOCK_ECON_SLUGS = [
     "moneycomics",
@@ -106,12 +108,15 @@ def food_channels() -> list[dict]:
 #   days(크롤 범위)와는 별개 축이다 — 수집은 하되 요약만 안 할 수 있다.
 # crawl_cap: 크롤 1회차에 시도할 영상 수 상한. 없거나 0 = 무제한.
 #   heavy는 큐가 수백 건(삼프로TV days=60 → 809건)이라 스로틀 상태에서 회차를 끝없이 늘린다.
+# skip_compilations: 모아보기·몰아보기 같은 편집본과 2시간 넘는 영상(라이브 다시보기)을 뺀다.
+#   편집본 속 가게는 원본 영상에 다 있어서 중복이고, 긴 자막은 추출만 비싸다(사용자 지시 10/19).
 CATEGORY_POLICY = {
     "stock_econ":   {"days": 30, "summary": True,  "min_duration_sec": 0,   "summary_days": 30},
     "news":         {"days": 30, "summary": True,  "min_duration_sec": 180, "summary_days": 30},
     "invest_media": {"days": 30, "summary": True,  "min_duration_sec": 180, "summary_days": 30},
     "culture":      {"days": 30, "summary": True,  "min_duration_sec": 180, "summary_days": 0},
-    "food":         {"days": 60, "summary": False, "min_duration_sec": 0,   "summary_days": 0},
+    "food":         {"days": 60, "summary": False, "min_duration_sec": 0,   "summary_days": 0,
+                     "skip_compilations": True},
     "heavy":        {"days": 60, "summary": False, "min_duration_sec": 0,   "summary_days": 0, "crawl_cap": 30},  # sampro_tv 등
 }
 
@@ -167,3 +172,12 @@ def category_of(slug: str) -> str:
 def policy_for(slug: str) -> dict:
     """slug → 정책 dict ({days, summary, min_duration_sec}). 미등록은 DEFAULT_POLICY."""
     return CATEGORY_POLICY.get(category_of(slug), DEFAULT_POLICY)
+
+
+COMPILATION_TITLE = re.compile(r"모아보기|몰아보기|모음집|합본|정주행")
+COMPILATION_MAX_SEC = 2 * 3600
+
+
+def is_compilation(title: str, duration_sec: int) -> bool:
+    """모아보기 편집본이거나 2시간 넘는 영상이면 True. duration_sec<=0(모름)은 길이로 판단하지 않는다."""
+    return bool(COMPILATION_TITLE.search(title or "")) or (duration_sec or 0) > COMPILATION_MAX_SEC

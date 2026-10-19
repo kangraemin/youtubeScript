@@ -35,7 +35,7 @@ from naver_search import REGION_MAP, name_similar, search_restaurant  # noqa: E4
 from restaurant_extractor import PROMPT_VERSION, ExtractBlocked, ExtractError, extract_restaurants  # noqa: E402
 from skip_logger import log_skipped  # noqa: E402
 from transcript_fetcher import fetch_transcript  # noqa: E402
-from scripts.channel_config import food_channels  # noqa: E402
+from scripts.channel_config import food_channels, is_compilation  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("pipeline")
@@ -67,10 +67,14 @@ def region_city(address: str | None) -> tuple[str | None, str | None]:
 # ── 후보 ──────────────────────────────────────────────────────────────
 
 def _published_dates() -> dict[str, str]:
+    """vid → 게시일. 모아보기·2시간 초과 영상은 빈 값 대신 None으로 표시해 candidates가 건너뛴다."""
     out = {}
     for ch in food_channels():
         try:
             for v in json.loads((TRANSCRIPTS / ch["slug"] / "_list.json").read_text(encoding="utf-8")):
+                if is_compilation(v.get("title", ""), v.get("duration_sec", 0)):
+                    out[v["vid"]] = None
+                    continue
                 out[v["vid"]] = v.get("meta", "")
         except (FileNotFoundError, json.JSONDecodeError):
             continue
@@ -100,6 +104,8 @@ def candidates(db, max_videos: int) -> list[dict]:
         for f in (TRANSCRIPTS / ch["slug"]).glob("*.txt"):
             vid = f.stem
             if not VIDEO_ID.match(vid):  # _no_transcript.txt 같은 표시용 파일
+                continue
+            if vid in dates and dates[vid] is None:  # 모아보기·2시간 초과 (원본 영상에 가게가 다 있다)
                 continue
             q = state.get(vid)
             if q and q.get("prompt_version") == PROMPT_VERSION:

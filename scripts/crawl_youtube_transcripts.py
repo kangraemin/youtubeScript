@@ -20,7 +20,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from scripts.channel_config import policy_for, category_of
+from scripts.channel_config import policy_for, category_of, is_compilation
 
 # 자막 패널 세그먼트 셀렉터 — 신 UI 우선. 구 UI는 body renderer 하위도 이 셀렉터로 잡힌다.
 SEGMENT_SELECTORS = [
@@ -126,6 +126,11 @@ def _attach_duration(youtube, videos: list, min_sec: int, ch: dict) -> list:
     if min_sec > 0:
         print(f"[{ch['name']}] 쇼츠/단편 필터: {len(videos)} → {len(kept)}개 "
               f"(min_duration_sec={min_sec})", flush=True)
+    if policy_for(ch["slug"]).get("skip_compilations"):
+        n = len(kept)
+        kept = [v for v in kept if not is_compilation(v.get("title", ""), v["duration_sec"])]
+        if len(kept) < n:
+            print(f"[{ch['name']}] 모아보기·2시간 초과 제외: {n} → {len(kept)}개", flush=True)
     return kept
 
 
