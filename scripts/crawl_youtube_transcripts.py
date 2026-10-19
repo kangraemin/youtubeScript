@@ -122,12 +122,10 @@ def _attach_duration(youtube, videos: list, min_sec: int, ch: dict) -> list:
     for v in videos:
         v["duration_sec"] = dur.get(v["vid"], -1)  # -1 = 조회 불가(삭제·비공개)
 
-    if min_sec <= 0:
-        return videos
-
-    kept = [v for v in videos if v["duration_sec"] >= min_sec]
-    print(f"[{ch['name']}] 쇼츠/단편 필터: {len(videos)} → {len(kept)}개 "
-          f"(min_duration_sec={min_sec})", flush=True)
+    kept = [v for v in videos if min_sec <= 0 or v["duration_sec"] >= min_sec]
+    if min_sec > 0:
+        print(f"[{ch['name']}] 쇼츠/단편 필터: {len(videos)} → {len(kept)}개 "
+              f"(min_duration_sec={min_sec})", flush=True)
     return kept
 
 
