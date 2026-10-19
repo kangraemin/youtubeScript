@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+from difflib import SequenceMatcher
 import requests
 
 logger = logging.getLogger(__name__)
@@ -149,6 +150,52 @@ def name_similar(a: str, b: str) -> bool:
     return x in y or y in x
 
 
+def name_close(a: str, b: str, threshold: float = 0.8) -> bool:
+    """name_similar이거나, 글자 순서 기준 닮은 정도(difflib ratio)가 threshold 이상이면 같은 가게로 본다.
+
+    자막 받아쓰기 오타(칙냉면/칡냉면)·"앤" 같은 한두 글자 차이를 살린다.
+    """
+    if name_similar(a, b):
+        return True
+    x, y = _norm_name(a), _norm_name(b)
+    if len(x) < 3 or len(y) < 3:
+        return False
+    return SequenceMatcher(None, x, y).ratio() >= threshold
+
+
+def _hint_has_street(hint: str, address: str) -> bool:
+    """힌트에 도로명+번지("서애로1길 6-4")가 그대로 있으면 True."""
+    m = re.search(r"([가-힣0-9]+(?:로|길)(?:\d+(?:번)?길)?)\s+(\d+(?:-\d+)?)", address or "")
+    return bool(m and hint and f"{m.group(1)} {m.group(2)}" in hint)
+
+
+def _hint_street(hint: str) -> str | None:
+    m = re.search(r"([가-힣0-9]+(?:로|길))\s*(?:\d+번?길)?", hint or "")
+    return m.group(1) if m else None
+
+
+def _confident(name: str, found: str, address: str, regions: list[str], hint: str, region_score: int) -> bool:
+    """확신 high 판정.
+
+    - 힌트에 도로명+번지가 그대로 있으면 high
+    - 이름이 포함 관계(name_similar)고 지역이 하나라도 맞으면 high
+    - 이름이 철자만 다른 정도(name_close)면 더 엄격히: 힌트 지역 키워드가 주소에 전부 있고,
+      힌트에 도로명이 있으면 주소의 도로명과도 같아야 high
+    """
+    if _hint_has_street(hint, address):
+        return True
+    if region_score < 1:
+        return False
+    if name_similar(name, found):
+        return True
+    if not name_close(name, found):
+        return False
+    if any(kw not in address for kw in regions):
+        return False
+    street = _hint_street(hint)
+    return not street or street in address
+
+
 def search_restaurant(name: str, address_hint: str = "") -> dict | None:
     """Search for a restaurant using 3-stage query fallback + region filter.
 
@@ -180,7 +227,7 @@ def search_restaurant(name: str, address_hint: str = "") -> dict | None:
         region = _extract_region(address)
         found_name = _strip_html(item.get("title", name))
         # 지역 힌트가 주소와 맞고 이름도 비슷해야 high. 나머지는 관리자 검수(is_visible=false)로 보낸다
-        confidence = "high" if region_score >= 1 and name_similar(name, found_name) else "low"
+        confidence = "high" if _confident(name, found_name, address, regions, address_hint, region_score) else "low"
         return {
             "name": found_name,
             "confidence": confidence,

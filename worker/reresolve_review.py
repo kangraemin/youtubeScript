@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from chain_blacklist import is_chain  # noqa: E402
-from naver_search import _hint_regions, _region_score, name_similar, search_restaurant  # noqa: E402
+from naver_search import _hint_regions, _region_score, name_close, name_similar, search_restaurant  # noqa: E402
 from pipeline import load_env, region_city, trigger_revalidate  # noqa: E402
 from supabase_client import get_client  # noqa: E402
 
@@ -42,6 +42,16 @@ def _said_entry(extracted: list[dict], current_name: str) -> dict | None:
         if s > score:
             best, score = e, s
     return best
+
+
+def _linked_elsewhere(db, r: dict, said_name: str) -> bool:
+    """같은 영상에 이어진 다른 가게 중 said_name과 같은 가게가 있는가."""
+    for v in r["videos"]:
+        rows = db.table("videos").select("restaurants(id,name)").eq("video_id", v["video_id"]).neq(
+            "restaurant_id", r["id"]).execute().data or []
+        if any(name_close(said_name, (x.get("restaurants") or {}).get("name", "")) for x in rows):
+            return True
+    return False
 
 
 def _fetch_all(db, table: str, select: str, **eq) -> list[dict]:
@@ -84,8 +94,9 @@ def main():
             out["kept"].append({"id": r["id"], "name": r["name"], "why": "추출 기록 없음"})
             continue
         hint = said.get("address_hint", "") or ""
-        if _bigram_sim(said.get("name", ""), r["name"]) < 0.5:
-            # 그 영상에서 이 가게로 이어진 이름을 못 찾았다 → 다른 가게와 헷갈릴 수 있어 손대지 않는다
+        far = _bigram_sim(said.get("name", ""), r["name"]) < 0.5
+        if far and _linked_elsewhere(db, r, said["name"]):
+            # 그 이름은 이미 이 영상의 다른 가게로 이어져 있다 → 이 행이 어디서 왔는지 몰라 손대지 않는다
             out["kept"].append({"id": r["id"], "name": r["name"], "said": said.get("name"), "hint": hint,
                                 "why": "추출 이름과 다름"})
             continue
@@ -109,6 +120,9 @@ def main():
             continue
         dup = db.table("restaurants").select("id").eq("name", loc["name"]).eq(
             "address", loc["address"]).neq("id", r["id"]).limit(1).execute().data
+        if dup and far:
+            out["kept"].append({**item, "why": "추출 이름과 다름(기존 가게 있음)"})
+            continue
         if dup:
             # 이미 있는 가게 → 영상을 그쪽으로 옮기고 잘못 잡힌 행은 지운다
             item["into"] = dup[0]["id"]
