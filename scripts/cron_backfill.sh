@@ -29,4 +29,7 @@ echo "[$(date '+%Y-%m-%d %H:%M:%S')] 시작" >> "$LOG"
 # DB에서 NULL 영상 목록 가져와서 Playwright로 수집 + 바로 업로드
 .venv/bin/python scripts/backfill_from_db.py --headless >> "$LOG" 2>&1
 
+# 크롤러가 포기한 먹방 영상(<slug>/_failed.json)은 오디오를 받아 맥 로컬 Whisper로 받아 적는다
+.venv/bin/python scripts/whisper_fallback.py --max-videos 5 >> "$LOG" 2>&1 || true
+
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 완료" >> "$LOG"

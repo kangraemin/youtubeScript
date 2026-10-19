@@ -95,16 +95,16 @@ def _search_candidates(query: str) -> list[dict]:
         return []
 
 
-def _pick_best(items: list[dict], regions: list[str]) -> dict | None:
-    """후보 중 hint 지역 키워드가 주소에 포함된 것 우선.
+def _pick_best(items: list[dict], regions: list[str]) -> tuple[dict | None, int]:
+    """후보 중 hint 지역 키워드가 주소에 많이 들어간 것을 고른다. (후보, 지역 점수)를 돌려준다.
 
-    regions가 비어있으면 첫 결과 사용.
-    모든 후보가 지역 불일치면 None 반환 (false positive 방지).
+    regions가 비어있으면 첫 결과(점수 0).
+    모든 후보가 지역 불일치면 (None, 0) (false positive 방지).
     """
     if not items:
-        return None
+        return None, 0
     if not regions:
-        return items[0]
+        return items[0], 0
     scored = []
     for it in items:
         addr = it.get("roadAddress") or it.get("address", "")
@@ -112,7 +112,23 @@ def _pick_best(items: list[dict], regions: list[str]) -> dict | None:
         scored.append((score, it))
     scored.sort(key=lambda x: -x[0])
     top_score, top_item = scored[0]
-    return top_item if top_score > 0 else None
+    return (top_item, top_score) if top_score > 0 else (None, 0)
+
+
+def _norm_name(s: str) -> str:
+    words = _strip_html(s or "").split()
+    # 띄어 쓴 마지막 단어가 "○○점"이면 지점명으로 보고 뗀다(붙여 쓴 이름은 건드리지 않는다)
+    if len(words) > 1 and words[-1].endswith("점"):
+        words = words[:-1]
+    return re.sub(r"[^가-힣A-Za-z0-9]", "", "".join(words)).lower()
+
+
+def name_similar(a: str, b: str) -> bool:
+    """공백·지점명("○○점")·문장부호를 지운 뒤 한쪽이 다른 쪽을 포함하면 같은 가게로 본다."""
+    x, y = _norm_name(a), _norm_name(b)
+    if not x or not y:
+        return False
+    return x in y or y in x
 
 
 def search_restaurant(name: str, address_hint: str = "") -> dict | None:
@@ -122,7 +138,7 @@ def search_restaurant(name: str, address_hint: str = "") -> dict | None:
     각 결과에서 hint의 지역 키워드가 주소에 포함된 것만 채택.
     한 단계에서 지역 일치 후보가 없으면 다음 쿼리로 이동.
 
-    Returns dict(name, address, lat, lng, region, naver_place_id) or None.
+    Returns dict(name, confidence, address, lat, lng, region, naver_place_id) or None.
     """
     regions = _hint_regions(address_hint)
     queries = []
@@ -133,7 +149,7 @@ def search_restaurant(name: str, address_hint: str = "") -> dict | None:
 
     for query in queries:
         items = _search_candidates(query)
-        item = _pick_best(items, regions)
+        item, region_score = _pick_best(items, regions)
         if not item:
             continue
         try:
@@ -144,8 +160,12 @@ def search_restaurant(name: str, address_hint: str = "") -> dict | None:
         road_address = item.get("roadAddress", "")
         address = road_address or item.get("address", "")
         region = _extract_region(address)
+        found_name = _strip_html(item.get("title", name))
+        # 지역 힌트가 주소와 맞고 이름도 비슷해야 high. 나머지는 관리자 검수(is_visible=false)로 보낸다
+        confidence = "high" if region_score >= 1 and name_similar(name, found_name) else "low"
         return {
-            "name": _strip_html(item.get("title", name)),
+            "name": found_name,
+            "confidence": confidence,
             "address": address,
             "lat": lat,
             "lng": lng,

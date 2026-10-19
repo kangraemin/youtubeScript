@@ -9,7 +9,10 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_TS_LINE = re.compile(r"^(\d+):(\d+)\s*(.*)$")
+# "M:SS text" 또는 "H:MM:SS text". 예전 패턴은 1:02:03을 62초로 읽었다.
+_TS_LINE = re.compile(r"^(?:(\d+):)?(\d+):(\d+)\s*(.*)$")
+# 크롤러가 쓰는 헤더: 제목 / URL / video_id: / collected_at: / 빈 줄
+_HEADER_LINES = 4
 _RAWDATA_DIR = Path(__file__).resolve().parent.parent / "rawdata" / "transcripts"
 
 
@@ -22,7 +25,8 @@ def fetch_transcript(video_id: str) -> list[dict] | None:
     path = matches[0]
     lines = path.read_text(encoding="utf-8").splitlines()
     segs: list[dict] = []
-    for line in lines[2:]:  # 제목/URL 스킵
+    body = lines[_HEADER_LINES:] if len(lines) > 3 and lines[2].startswith("video_id:") else lines[2:]
+    for line in body:
         s = line.strip()
         if not s:
             continue
@@ -31,8 +35,8 @@ def fetch_transcript(video_id: str) -> list[dict] | None:
             if segs:
                 segs[-1]["text"] += " " + s
             continue
-        mm, ss, rest = m.group(1), m.group(2), m.group(3)
-        segs.append({"start": float(int(mm) * 60 + int(ss)), "text": rest.strip()})
+        hh, mm, ss, rest = m.groups()
+        segs.append({"start": float(int(hh or 0) * 3600 + int(mm) * 60 + int(ss)), "text": rest.strip()})
     if segs:
         logger.info(
             "로컬 자막 사용: %s (%d segments, %s)",

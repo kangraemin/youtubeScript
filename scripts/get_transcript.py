@@ -12,16 +12,11 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound, TranscriptsDisabled
 
-CHANNELS = [
-    {"id": "UCehQiKylaW68H_OtRS36wGQ", "slug": "dulcinea_studio", "name": "둘시네아"},
-    {"id": "UCfpaSruWW3S4dibonKXENjA", "slug": "tzuyang",          "name": "쯔양"},
-    {"id": "UCzgpOnor-MzT-1iflZil2GQ", "slug": "jaesunrang",       "name": "재선랑"},
-    {"id": "UC-OAmhcFgX9t_OF6fQ-4B1w", "slug": "kimjjamppong",     "name": "김쨈뽕"},
-    {"id": "UC-x55HF1-IilhxZOzwJm7JA", "slug": "kimsawon",         "name": "김사원"},
-    {"id": "UCJo6G1u0e_-wS-JQn3T-zEw", "slug": "moneycomics",      "name": "머니코믹스"},
-]
+from scripts.channel_config import CHANNELS  # noqa: E402
 
 
 def extract_video_id(url_or_id: str) -> str:

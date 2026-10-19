@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fill channel thumbnail_url in Supabase channels table from YouTube API."""
+"""channels 테이블을 channel_config의 먹방 채널과 맞춘다(id·이름·URL용 slug·썸네일)."""
 
 import logging
 import os
@@ -10,7 +10,9 @@ from dotenv import load_dotenv
 from googleapiclient.discovery import build
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from supabase_client import get_client
+from scripts.channel_config import food_channels
 
 logging.basicConfig(
     level=logging.INFO,
@@ -18,13 +20,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-CHANNELS = [
-    "UCehQiKylaW68H_OtRS36wGQ",  # 둘시네아
-    "UCyn-K7rZLXjGl7VXGweIlcA",  # 백종원
-    "UCl23-Cci_SMqyGXE1T_LYUg",  # 성시경 먹을텐데
-    "UCfpaSruWW3S4dibonKXENjA",  # 쯔양
-    "UCA6KBBX8cLwYZNepxlE_7SA",  # 히밥
-]
 
 
 def main():
@@ -37,29 +32,22 @@ def main():
 
     response = youtube.channels().list(
         part="snippet",
-        id=",".join(CHANNELS),
+        id=",".join(ch["id"] for ch in food_channels()),
     ).execute()
 
-    for item in response.get("items", []):
-        channel_id = item["id"]
-        thumbnail_url = (
-            item["snippet"]
-            .get("thumbnails", {})
-            .get("high", {})
-            .get("url")
-        )
-
-        if not thumbnail_url:
-            logger.warning("No thumbnail for %s", channel_id)
-            continue
-
-        result = (
-            db.table("channels")
-            .update({"thumbnail_url": thumbnail_url})
-            .eq("id", channel_id)
-            .execute()
-        )
-        logger.info("Updated %s: %s", channel_id, thumbnail_url)
+    thumbs = {
+        it["id"]: it["snippet"].get("thumbnails", {}).get("high", {}).get("url")
+        for it in response.get("items", [])
+    }
+    for ch in food_channels():
+        # slug는 웹 주소(/youtuber/쯔양)에 그대로 쓰는 한글 이름이다
+        row = {"id": ch["id"], "name": ch["name"], "slug": ch["name"]}
+        if thumbs.get(ch["id"]):
+            row["thumbnail_url"] = thumbs[ch["id"]]
+        else:
+            logger.warning("No thumbnail for %s", ch["id"])
+        db.table("channels").upsert(row, on_conflict="id").execute()
+        logger.info("Synced %s (%s)", ch["name"], ch["id"])
 
     logger.info("Done. %d channels processed.", len(response.get("items", [])))
 

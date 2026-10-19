@@ -1,11 +1,47 @@
+"""먹방 영상 자막에서 실제 방문한 식당을 뽑는다 — claude -p(구독 CLI, API 키 아님).
+
+결정 _global/process/no-anthropic-api-calls: 코드에서 Anthropic API를 부르지 않는다.
+실패(CLI 오류·JSON 깨짐)는 ExtractError로 올려서 "가게 없음"과 구분한다.
+"""
 import json
 import logging
 import os
-from anthropic import Anthropic
+import re
+import subprocess
 
 from chain_blacklist import CHAIN_NAMES
 
 logger = logging.getLogger(__name__)
+
+# 프롬프트나 스키마를 바꾸면 올린다. processing_queue.prompt_version이 다르면 다시 처리 대상이 된다.
+PROMPT_VERSION = "v2-2026-10-19"
+CLAUDE = os.path.expanduser("~/.local/bin/claude")
+MODEL = os.environ.get("EXTRACT_MODEL", "sonnet")
+# 기본 지시문·도구·설정을 빼면 호출당 고정 비용이 4만 5천 → 600토큰으로 준다(--bare는 API 키 인증이라 안 씀)
+FLAGS = ["--output-format", "json", "--system-prompt", "먹방 자막에서 방문 식당을 뽑아 JSON 하나만 출력하는 추출기다.",
+         "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--no-session-persistence"]
+MAX_TRANSCRIPT_CHARS = 40_000
+
+
+# .env.local에 ANTHROPIC_API_KEY가 있으면 claude -p가 구독 대신 API 키로 과금한다(실측: "Credit balance is too low").
+# 자식 프로세스 env에서 빼서 항상 구독 계정 로그인으로 돌게 한다.
+_API_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
+
+
+def _cli_env() -> dict:
+    return {k: v for k, v in os.environ.items() if k not in _API_ENV}
+
+
+class ExtractError(Exception):
+    """추출 자체가 실패했다(가게 0개와 다름). 재시도 대상."""
+
+
+class ExtractBlocked(ExtractError):
+    """로그인 만료·사용 한도처럼 영상과 무관하게 전부 실패하는 경우. 회차를 멈추고 재시도 횟수는 쓰지 않는다."""
+
+
+_BLOCKED = re.compile(r"authenticat|OAuth|log ?in|hit your .*limit|usage limit|rate limit", re.I)
+
 
 _CHAIN_LINE = ", ".join(CHAIN_NAMES)
 
@@ -22,7 +58,7 @@ _PROMPT_BODY = """다음은 유튜브 영상의 제목, 설명, 자막입니다.
 {transcript}
 
 다음 JSON 형식으로만 응답하세요 (다른 텍스트 없이):
-{{"restaurants": [{{"name": "가게명", "address_hint": "구체적 지역", "category": "카테고리", "rating": "평가", "summary": "한줄평", "is_ad": false, "timestamp_seconds": 0}}]}}
+{{"restaurants": [{{"name": "가게명", "address_hint": "구체적 지역", "category": "카테고리", "rating": "평가", "summary": "한줄평", "is_ad": false, "timestamp_seconds": 0, "visited": true, "menu": "먹은 메뉴와 양", "price": "영상에서 말한 가격", "quote": "유튜버 발언 원문", "why": "추천 이유 또는 아쉬운 점"}}]}}
 
 규칙:
 - **실제 방문하여 먹는 장면이 있는 경우만** 추출. 단순 언급/경품/이벤트/회의는 제외
@@ -39,7 +75,12 @@ _PROMPT_BODY = """다음은 유튜브 영상의 제목, 설명, 자막입니다.
 - category: 한식/일식/중식/양식/카페/디저트/분식/고기/구이/해산물/기타 중 택1
 - rating: 강력추천/추천/보통/비추/언급없음 중 택1 (유튜버의 반응 기반)
 - summary: 유튜버가 언급한 핵심 한줄평 (30자 이내)
-- timestamp_seconds: 해당 가게가 처음 언급되는 시점(초), 정수
+- timestamp_seconds: 해당 가게가 처음 언급되는 시점(초), 정수. 자막의 [H:MM:SS] 또는 [MM:SS]를 초로 바꾼다
+- visited: 유튜버가 그 가게에 **직접 가서** 먹었으면 true. 배달·포장·택배로 받아 먹었거나 이름만 언급했으면 false
+- menu: 실제로 먹은 메뉴와 양 (예: "육전 3인분, 물냉면"). 모르면 ""
+- price: 영상에서 말한 가격만 (예: "육전 1인분 15,000원"). 말하지 않았으면 "" — 추측 금지
+- quote: 그 가게 음식에 대한 유튜버의 말을 **자막에 적힌 그대로** 1~2문장(80자 이내) 복사. 고치거나 지어내지 말 것. 적당한 말이 없으면 ""
+- why: 추천 이유 또는 아쉬운 점 한 문장 (30자 이내)
 - 맛집 영상이 아닌 경우(노래, 브이로그, 회의, 이벤트 홍보 등) 빈 배열 반환
 - 가게가 없으면 빈 배열: {{"restaurants": []}}
 - JSON만 응답"""
@@ -47,67 +88,82 @@ _PROMPT_BODY = """다음은 유튜브 영상의 제목, 설명, 자막입니다.
 EXTRACT_PROMPT = _PROMPT_BODY.replace("__CHAINS__", _CHAIN_LINE)
 
 
+def _fmt(sec: float) -> str:
+    sec = int(sec)
+    h, rem = divmod(sec, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m:02d}:{s:02d}"
+
+
+def _squash(s: str) -> str:
+    return re.sub(r"[^가-힣A-Za-z0-9]", "", s or "")
+
+
+def verify_quote(quote: str, transcript_text: str) -> str:
+    """quote가 자막에 실제로 있는 문장일 때만 남긴다(공백·문장부호 무시). 없으면 "" — 지어낸 인용 방지."""
+    q = _squash(quote)
+    if len(q) < 4:
+        return ""
+    return quote.strip() if q in _squash(transcript_text) else ""
+
+
 def extract_restaurants(
     transcript_segments: list[dict],
     title: str = "",
     description: str = "",
 ) -> tuple[list[dict], dict]:
-    """Extract restaurant info from transcript using Claude Haiku.
+    """자막에서 직접 방문한 식당 목록을 뽑는다.
 
-    Returns (restaurants_list, token_usage_dict).
-    token_usage_dict: {"input_tokens": int, "output_tokens": int}
+    Returns (restaurants, usage). visited=false는 빼고, quote는 자막 대조를 통과한 것만 남긴다.
+    Raises ExtractError: CLI 실패·시간 초과·JSON 파싱 실패.
     """
-    lines = []
-    for seg in transcript_segments:
-        minutes = int(seg["start"] // 60)
-        seconds = int(seg["start"] % 60)
-        lines.append(f"[{minutes:02d}:{seconds:02d}] {seg['text']}")
-    transcript_text = "\n".join(lines)
-
-    if len(transcript_text) > 15000:
-        transcript_text = transcript_text[:15000] + "\n... (자막 생략)"
-
+    transcript_text = "\n".join(f"[{_fmt(seg['start'])}] {seg['text']}" for seg in transcript_segments)
+    if len(transcript_text) > MAX_TRANSCRIPT_CHARS:
+        transcript_text = transcript_text[:MAX_TRANSCRIPT_CHARS] + "\n... (자막 생략)"
     desc_text = description[:2000] if description else "(설명 없음)"
+    prompt = EXTRACT_PROMPT.format(
+        title=title or "(제목 없음)", description=desc_text, transcript=transcript_text,
+    )
 
-    client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-
-    text = ""
+    r = None
     try:
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=2000,
-            messages=[
-                {
-                    "role": "user",
-                    "content": EXTRACT_PROMPT.format(
-                        title=title or "(제목 없음)",
-                        description=desc_text,
-                        transcript=transcript_text,
-                    ),
-                }
-            ],
-        )
+        r = subprocess.run([CLAUDE, "-p", prompt, "--model", MODEL, *FLAGS],
+                           capture_output=True, text=True, timeout=300, cwd="/tmp", env=_cli_env())
+        res = json.loads(r.stdout)
+    except subprocess.TimeoutExpired as e:
+        raise ExtractError("claude -p 시간 초과") from e
+    except (json.JSONDecodeError, OSError) as e:
+        raise ExtractError(f"claude -p 출력 이상: {(r.stderr if r else str(e))[:200]}") from e
+    if res.get("is_error"):
+        msg = str(res.get("result", ""))[:200]
+        raise (ExtractBlocked if _BLOCKED.search(msg) else ExtractError)(msg)
 
-        token_usage = {
-            "input_tokens": response.usage.input_tokens,
-            "output_tokens": response.usage.output_tokens,
-        }
-
-        text = response.content[0].text.strip()
-
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-            text = text.strip()
-
-        data = json.loads(text)
-        restaurants = data.get("restaurants", [])
-        return restaurants, token_usage
-
+    m = re.search(r"\{.*\}", res.get("result", ""), re.S)
+    if not m:
+        raise ExtractError(f"JSON 없음: {res.get('result', '')[:200]}")
+    try:
+        data = json.loads(re.sub(r",\s*([}\]])", r"\1", m.group(0)))  # 끝 쉼표 허용
     except json.JSONDecodeError as e:
-        logger.error("JSON parse failed: %s / response: %s", e, text[:200])
-        return [], {"input_tokens": 0, "output_tokens": 0}
-    except Exception as e:
-        logger.error("Claude API error: %s", e)
-        return [], {"input_tokens": 0, "output_tokens": 0}
+        raise ExtractError(f"JSON 파싱 실패: {e}") from e
+
+    u = res.get("usage", {}) or {}
+    usage = {
+        "input_tokens": int(u.get("input_tokens", 0)) + int(u.get("cache_read_input_tokens", 0))
+        + int(u.get("cache_creation_input_tokens", 0)),
+        "output_tokens": int(u.get("output_tokens", 0)),
+    }
+
+    plain_text = " ".join(seg["text"] for seg in transcript_segments)
+    out = []
+    for rest in data.get("restaurants", []) or []:
+        if not isinstance(rest, dict) or not rest.get("name"):
+            continue
+        if rest.get("visited") is False:
+            logger.info("직접 방문 아님 → 제외: %s", rest.get("name"))
+            continue
+        # 줄 사이 타임스탬프 숫자가 끼면 여러 줄에 걸친 인용이 대조에 실패하므로 본문만 이어 붙여 비교한다
+        rest["quote"] = verify_quote(rest.get("quote", ""), plain_text)
+        for k in ("menu", "price", "why"):
+            rest[k] = (rest.get(k) or "").strip()
+        out.append(rest)
+    return out, usage

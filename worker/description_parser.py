@@ -10,15 +10,12 @@ import time
 import requests
 
 from chain_blacklist import is_chain
+from closure_check import fetch_place
 
 logger = logging.getLogger(__name__)
 
 NAVER_ME = re.compile(r"https?://naver\.me/[A-Za-z0-9]+")
 UA = {"User-Agent": "Mozilla/5.0", "Referer": "https://map.naver.com/"}
-
-# map.naver.com 내부 API. 공식 문서에는 없지만 2026-04 기준 200 반환.
-PLACE_SUMMARY_URL = "https://map.naver.com/v5/api/place/summary/{place_id}"
-
 
 def _resolve_shortlink(url: str) -> str | None:
     """`https://naver.me/XXX` → `map.naver.com/.../place/{place_id}` 리다이렉트 추적."""
@@ -28,33 +25,6 @@ def _resolve_shortlink(url: str) -> str | None:
         return m.group(1) if m else None
     except Exception as e:
         logger.warning("naver.me resolve failed %s: %s", url, e)
-        return None
-
-
-def _fetch_place_summary(place_id: str) -> dict | None:
-    """내부 place summary API에서 이름/주소/좌표/카테고리 추출."""
-    try:
-        r = requests.get(
-            PLACE_SUMMARY_URL.format(place_id=place_id),
-            headers=UA, timeout=5,
-        )
-        if r.status_code != 200:
-            return None
-        d = (r.json().get("data") or {}).get("placeDetail") or {}
-        if not d:
-            return None
-        addr = d.get("address") or {}
-        coord = d.get("coordinate") or {}
-        return {
-            "naver_place_id": d.get("id"),
-            "name": d.get("name"),
-            "category": (d.get("category") or {}).get("category"),
-            "address": addr.get("roadAddress") or addr.get("address"),
-            "lat": coord.get("latitude"),
-            "lng": coord.get("longitude"),
-        }
-    except Exception as e:
-        logger.warning("place summary failed %s: %s", place_id, e)
         return None
 
 
@@ -74,8 +44,14 @@ def parse_description_places(description: str) -> list[dict]:
         pid = _resolve_shortlink(link)
         if not pid:
             continue
-        info = _fetch_place_summary(pid)
+        # 예전 map.naver.com/v5/api/place/summary는 301만 준다(2026-10-19) → 모바일 플레이스 페이지로 읽는다
+        info = fetch_place(pid)
         if not info or info.get("lat") is None:
+            if info and info.get("status") == "closed":
+                logger.info("description 폐업/없는 가게 스킵: %s", pid)
+            continue
+        if info.get("status") == "closed":
+            logger.info("description 폐업 가게 스킵: %s", info.get("name"))
             continue
         if is_chain(info.get("name", "")):
             logger.info("description 체인점 스킵: %s", info.get("name"))

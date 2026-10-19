@@ -117,21 +117,32 @@ def update_queue_status(
     client.table("processing_queue").update(data).eq("video_id", video_id).execute()
 
 
+# 사람이 관리자 화면에서 바꿨을 수 있는 칸 — 기존 행을 갱신할 때는 덮어쓰지 않는다
+_HUMAN_FIELDS = ("needs_review", "is_visible")
+
+
 def upsert_restaurant(client: Client, restaurant: dict) -> int:
-    """Upsert restaurant and return its id."""
-    res = (
-        client.table("restaurants")
-        .upsert(restaurant, on_conflict="name,address")
-        .execute()
-    )
-    if res.data:
-        return res.data[0]["id"]
-    # fallback: query by name+address
-    q = client.table("restaurants").select("id").eq("name", restaurant["name"])
-    if restaurant.get("address"):
-        q = q.eq("address", restaurant["address"])
-    row = q.limit(1).execute()
-    return row.data[0]["id"]
+    """가게를 넣거나 갱신하고 id를 돌려준다.
+
+    중복 판정: naver_place_id가 있으면 그것으로 먼저 찾고, 없으면 (name, address).
+    기존 행이면 needs_review / is_visible은 그대로 둔다.
+    """
+    hit = None
+    if restaurant.get("naver_place_id"):
+        hit = (client.table("restaurants").select("id")
+               .eq("naver_place_id", restaurant["naver_place_id"]).limit(1).execute()).data
+    if not hit:
+        q = client.table("restaurants").select("id").eq("name", restaurant["name"])
+        q = q.eq("address", restaurant["address"]) if restaurant.get("address") else q.is_("address", "null")
+        hit = q.limit(1).execute().data
+    if hit:
+        rid = hit[0]["id"]
+        upd = {k: v for k, v in restaurant.items() if k not in _HUMAN_FIELDS and v is not None}
+        if upd:
+            client.table("restaurants").update(upd).eq("id", rid).execute()
+        return rid
+    res = client.table("restaurants").insert(restaurant).execute()
+    return res.data[0]["id"]
 
 
 def upsert_video(client: Client, video: dict) -> None:

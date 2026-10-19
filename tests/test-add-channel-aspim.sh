@@ -7,7 +7,7 @@ PASS=0; FAIL=0
 check(){ if eval "$2"; then echo "✅ $1"; PASS=$((PASS+1)); else echo "❌ $1"; FAIL=$((FAIL+1)); fi; }
 
 # TC-1 (happy): CHANNELS 리스트에 aspim_research 등록됨
-check "TC-1 CHANNELS 등록" "grep -q 'aspim_research' scripts/crawl_youtube_transcripts.py"
+check "TC-1 CHANNELS 등록" "grep -q 'aspim_research' scripts/channel_config.py"
 
 # TC-2 (integration): SUMMARY_SLUGS에 aspim_research 포함 + invest_media 분류 (요약 큐 자동 진입)
 check "TC-2 SUMMARY_SLUGS 포함" ".venv/bin/python -c \"from scripts.channel_config import SUMMARY_SLUGS,category_of; assert 'aspim_research' in SUMMARY_SLUGS; assert category_of('aspim_research')=='invest_media'\""

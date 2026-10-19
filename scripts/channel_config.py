@@ -40,6 +40,9 @@ FOOD_SLUGS = [
     "jaesunrang",
     "kimjjamppong",
     "kimsawon",
+    "heebab",
+    "sungsikyung",
+    "chureupkyeon",
 ]
 
 # 영상 너무 많은 별도 채널 (요약 제외, 수집은 함)
@@ -55,6 +58,43 @@ SUMMARY_SLUGS = STOCK_ECON_SLUGS + NEWS_SLUGS + INVEST_MEDIA_SLUGS + CULTURE_SLU
 # 워커가 제목+앞부분으로 주식·경제 요약 가치를 판정해, 가치 없으면 screened_out 처리한다.
 # moneycomics: 콩트·상황극(「대표랑 외모로 싸우는 직원」 등)이 섞여 요약 피드에 노출됐다(2026-10-08).
 SCREEN_SLUGS = {"jisik_inside", "yonhap_economy", "moneycomics"}
+
+
+# === 채널 정의 (크롤러·get_transcript·mukmap 파이프라인이 공유) ===
+# title_include: 제목에 이 문자열이 있는 영상만 목록에 넣는다.
+CHANNELS = [
+    {"id": "UCehQiKylaW68H_OtRS36wGQ", "slug": "dulcinea_studio",   "name": "둘시네아",            "tab": "videos"},
+    {"id": "UCfpaSruWW3S4dibonKXENjA", "slug": "tzuyang",            "name": "쯔양",               "tab": "videos"},
+    {"id": "UCzgpOnor-MzT-1iflZil2GQ", "slug": "jaesunrang",         "name": "재선랑",             "tab": "videos"},
+    {"id": "UC-OAmhcFgX9t_OF6fQ-4B1w", "slug": "kimjjamppong",       "name": "김쨈뽕",            "tab": "videos"},
+    {"id": "UC-x55HF1-IilhxZOzwJm7JA", "slug": "kimsawon",           "name": "김사원",             "tab": "videos"},
+    {"id": "UCJo6G1u0e_-wS-JQn3T-zEw", "slug": "moneycomics",        "name": "머니코믹스",         "tab": "videos"},
+    {"id": "UCsJ6RuBiTVWRX156FVbeaGg", "slug": "shukaworld",         "name": "슈카월드",           "tab": "videos", "handle": "syukaworld"},
+    {"id": "UChlv4GSd7OQl3js-jkLOnFA", "slug": "sampro_tv",          "name": "삼프로TV",           "tab": "videos"},
+    {"id": "UCA_hgsFzmynpv1zkvA5A7jA", "slug": "jisik_inside",       "name": "지식인사이드",       "tab": "videos"},
+    {"id": "UC6kZpTl39-_SqfBrF1-N2oQ", "slug": "yonhap_economy",     "name": "연합뉴스경제TV",     "tab": "videos"},
+    {"id": "UCvrOll07bwpNzGhBHRB5_yw", "slug": "developmong",        "name": "웅덩이매수디벨롭몽", "tab": "videos"},
+    {"id": "",                           "slug": "doniggangpae",       "name": "돈이깡패다",          "tab": "videos", "handle": "돈이깡패다"},
+    {"id": "UCIipmgxpUxDmPP-ma3Ahvbw", "slug": "mk_wallstreet",      "name": "매경 월가월부",      "tab": "videos"},
+    {"id": "UChY8VUjXv0aA7RF9hDQ0ISg", "slug": "sbs_gyoyangi",       "name": "교양이를 부탁해",    "tab": "videos"},
+    {"id": "",                           "slug": "aspim_research",     "name": "애스핌 리서치",      "tab": "videos", "handle": "ASPIM_research"},
+    # 머니코믹스에서 분리된 두 채널 (2026-08 확인)
+    # 알상무: 머니코믹스 하차 후 독립. 매일 아침 "당일전략"(9~19분)이 핵심이라 쇼츠 필터를 걸지 않는다.
+    {"id": "UCiDmfbYvuMEVbRxPmFP4sng", "slug": "alsangmoo",          "name": "알상무",             "tab": "videos", "handle": "rsangmoo"},
+    # 위폴: 머니코믹스 아침방송 [바이킹스]가 분리된 슈카친구들 채널. 평일 아침 7시 20분 라이브.
+    {"id": "UCMnFS27HnroIc1D4ct37TUA", "slug": "wepoll",             "name": "위폴",               "tab": "videos", "handle": "wepoll_original"},
+    # 먹방 신규 (2026-10-19). 세 채널 모두 유튜브 자동 자막이 있다. 백종원은 제외(사용자 지시).
+    {"id": "UCA6KBBX8cLwYZNepxlE_7SA", "slug": "heebab",             "name": "히밥",               "tab": "videos"},
+    # 성시경 본채널. 노래·라디오 영상이 섞여 있어 제목에 "먹을텐데"가 있는 회차만 받는다.
+    {"id": "UCl23-Cci_SMqyGXE1T_LYUg", "slug": "sungsikyung",        "name": "먹을텐데",           "tab": "videos",
+     "title_include": "먹을텐데"},
+    {"id": "UCqVjsRNWQM-ZBl27Pp8qI5g", "slug": "chureupkyeon",       "name": "츄릅켠",             "tab": "videos", "handle": "chureupkyeon"},
+]
+
+
+def food_channels() -> list[dict]:
+    """맛집 파이프라인 대상 채널."""
+    return [c for c in CHANNELS if c["slug"] in FOOD_SLUGS]
 
 
 # === 카테고리 정책 ===

@@ -1,5 +1,7 @@
 supabase
-anthropic
 google-api-python-client
 requests
 python-dotenv
+youtube-transcript-api
+yt-dlp
+mlx-whisper

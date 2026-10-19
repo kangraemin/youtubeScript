@@ -31,32 +31,14 @@ PANEL_TIMEOUT_MS = 12_000
 # 연속 실패 N건이면 채널 조기 종료. 런 초반 정상 → 중반부터 전건 실패는 소프트 스로틀 시그니처라
 # 계속 때려도 수집량은 늘지 않고 차단 지속시간과 락 점유만 늘어난다.
 CONSEC_FAIL_LIMIT = 8
+# 같은 영상이 이 횟수만큼 실패하면 크롤 대상에서 뺀다. 자막이 아예 없는 영상을 매 회차 다시 때리지 않기 위해서다.
+# 빠진 영상은 <slug>/_failed.json에 남고, 먹방 채널은 whisper_fallback.py가 오디오로 받는다.
+GIVEUP_FAILS = 3
 # 런 전체 상한(분). 건당 타임아웃만으론 회차 길이가 유계가 아니라서(실패 139건 × 135초 = 5시간+)
 # 공유 락을 7시간 넘게 쥐고 2시간 cron을 전부 스킵시켰다(2026-10-03).
 DEFAULT_RUN_MINUTES = 90
 
-CHANNELS = [
-    {"id": "UCehQiKylaW68H_OtRS36wGQ", "slug": "dulcinea_studio",   "name": "둘시네아",            "tab": "videos"},
-    {"id": "UCfpaSruWW3S4dibonKXENjA", "slug": "tzuyang",            "name": "쯔양",               "tab": "videos"},
-    {"id": "UCzgpOnor-MzT-1iflZil2GQ", "slug": "jaesunrang",         "name": "재선랑",             "tab": "videos"},
-    {"id": "UC-OAmhcFgX9t_OF6fQ-4B1w", "slug": "kimjjamppong",       "name": "김쨈뽕",            "tab": "videos"},
-    {"id": "UC-x55HF1-IilhxZOzwJm7JA", "slug": "kimsawon",           "name": "김사원",             "tab": "videos"},
-    {"id": "UCJo6G1u0e_-wS-JQn3T-zEw", "slug": "moneycomics",        "name": "머니코믹스",         "tab": "videos"},
-    {"id": "UCsJ6RuBiTVWRX156FVbeaGg", "slug": "shukaworld",         "name": "슈카월드",           "tab": "videos", "handle": "syukaworld"},
-    {"id": "UChlv4GSd7OQl3js-jkLOnFA", "slug": "sampro_tv",          "name": "삼프로TV",           "tab": "videos"},
-    {"id": "UCA_hgsFzmynpv1zkvA5A7jA", "slug": "jisik_inside",       "name": "지식인사이드",       "tab": "videos"},
-    {"id": "UC6kZpTl39-_SqfBrF1-N2oQ", "slug": "yonhap_economy",     "name": "연합뉴스경제TV",     "tab": "videos"},
-    {"id": "UCvrOll07bwpNzGhBHRB5_yw", "slug": "developmong",        "name": "웅덩이매수디벨롭몽", "tab": "videos"},
-    {"id": "",                           "slug": "doniggangpae",       "name": "돈이깡패다",          "tab": "videos", "handle": "돈이깡패다"},
-    {"id": "UCIipmgxpUxDmPP-ma3Ahvbw", "slug": "mk_wallstreet",      "name": "매경 월가월부",      "tab": "videos"},
-    {"id": "UChY8VUjXv0aA7RF9hDQ0ISg", "slug": "sbs_gyoyangi",       "name": "교양이를 부탁해",    "tab": "videos"},
-    {"id": "",                           "slug": "aspim_research",     "name": "애스핌 리서치",      "tab": "videos", "handle": "ASPIM_research"},
-    # 머니코믹스에서 분리된 두 채널 (2026-08 확인)
-    # 알상무: 머니코믹스 하차 후 독립. 매일 아침 "당일전략"(9~19분)이 핵심이라 쇼츠 필터를 걸지 않는다.
-    {"id": "UCiDmfbYvuMEVbRxPmFP4sng", "slug": "alsangmoo",          "name": "알상무",             "tab": "videos", "handle": "rsangmoo"},
-    # 위폴: 머니코믹스 아침방송 [바이킹스]가 분리된 슈카친구들 채널. 평일 아침 7시 20분 라이브.
-    {"id": "UCMnFS27HnroIc1D4ct37TUA", "slug": "wepoll",             "name": "위폴",               "tab": "videos", "handle": "wepoll_original"},
-]
+from scripts.channel_config import CHANNELS  # noqa: E402 — 채널 정의는 channel_config 한 곳에만 둔다
 
 
 def parse_args():
@@ -77,6 +59,10 @@ def parse_args():
                    help="런 전체 상한(분). 넘으면 남은 영상은 다음 회차로 (0 = 무제한)")
     p.add_argument("--workers", type=int, default=3,
                    help="병렬 처리 worker 수 (기본: 3)")
+    p.add_argument("--dry-list", action="store_true",
+                   help="영상 목록만 세고 끝낸다(자막 수집·_list.json 저장 안 함)")
+    p.add_argument("--crawl-cap", type=int, default=0,
+                   help="채널당 이번 회차에 새로 받을 영상 수 상한 (0 = 정책값/무제한). 며칠에 나눠 받는 백필용")
     return p.parse_args()
 
 
@@ -164,6 +150,7 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
         print(f"  [API] handle '{handle}' → {channel_id}", flush=True)
 
     tab = ch.get("tab", "videos")
+    title_include = ch.get("title_include")
     videos = []
 
     def _finalize(vs: list) -> list:
@@ -192,6 +179,9 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
                 title = item["snippet"]["title"]
                 published_at = item["snippet"]["publishedAt"]
                 pub_dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+                # 시리즈만 받는 채널(먹을텐데). max_videos보다 먼저 걸러야 상한이 시리즈 기준이 된다.
+                if title_include and title_include not in title:
+                    continue
                 if cutoff and pub_dt < cutoff:
                     stale_run += 1
                     if stale_run >= STALE_RUN_LIMIT:
@@ -224,6 +214,9 @@ def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) 
                 title = snippet["title"]
                 published_at = snippet["publishedAt"]
                 pub_dt = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+                # 시리즈만 받는 채널(먹을텐데). max_videos보다 먼저 걸러야 상한이 시리즈 기준이 된다.
+                if title_include and title_include not in title:
+                    continue
                 if cutoff and pub_dt < cutoff:
                     stale_run += 1
                     if stale_run >= STALE_RUN_LIMIT:
@@ -322,7 +315,36 @@ def segments_from_json3(data: dict, chunk_sec: float = 5.0) -> list[dict]:
     return out
 
 
+def _fetch_via_api(vid: str) -> list[dict] | None:
+    """youtube-transcript-api로 자막을 받는다(브라우저 없이). 실패하면 None → Playwright 경로로 넘어간다.
+
+    YouTube가 이 경로의 IP를 막아도(RequestBlocked 등) 예외를 삼켜 수집이 멈추지 않게 한다.
+    """
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+        segs = YouTubeTranscriptApi().fetch(vid, languages=["ko", "a.ko", "ko-KR"])
+    except Exception as e:
+        print(f"    [transcript] api 실패 {vid}: {type(e).__name__}", flush=True)
+        return None
+    out = [{"timestamp": _fmt_ts(s.start), "text": s.text.replace("\n", " ").strip()} for s in segs]
+    out = [s for s in out if s["text"]]
+    return out or None
+
+
 def get_transcript(page, vid: str) -> list[dict] | None:
+    """youtube-transcript-api를 먼저 시도하고, 안 되면 스크립트 패널 → 플레이어 timedtext 순으로 받는다.
+
+    page가 None이면 API 경로만 쓴다(브라우저를 띄우지 않는 회차).
+    """
+    segs = _fetch_via_api(vid)
+    if segs:
+        return segs
+    if page is None:
+        return None
+    return _get_transcript_browser(page, vid)
+
+
+def _get_transcript_browser(page, vid: str) -> list[dict] | None:
     """스크립트 패널로 수집하고, 패널이 실패하면 플레이어 timedtext 응답으로 대체한다.
 
     2026-10-06 실측: 소프트 스로틀 때 막히는 건 패널의 youtubei/v1/get_transcript
@@ -547,7 +569,24 @@ def save_list_json(out_dir: str, slug: str, videos: list[dict]):
     os.replace(tmp, path)
 
 
-def process_channel(ch, headless, output_dir, max_videos, days, skip_existing, deadline=None):
+def load_failed(out_dir: str, slug: str) -> dict:
+    path = Path(out_dir) / slug / "_failed.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_failed(out_dir: str, slug: str, failed: dict):
+    path = Path(out_dir) / slug / "_failed.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(failed, ensure_ascii=False, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def process_channel(ch, headless, output_dir, max_videos, days, skip_existing, deadline=None,
+                    dry_list=False, crawl_cap=0):
     prefix = f"[{ch['name']}]"
     if deadline and time.time() >= deadline:
         print(f"{prefix} 런 상한 도달 — 이번 회차 건너뜀", flush=True)
@@ -562,6 +601,11 @@ def process_channel(ch, headless, output_dir, max_videos, days, skip_existing, d
     print(f"\n{prefix} ===== {ch['slug']} (category={cat}, days={effective_days}) =====", flush=True)
     videos = get_channel_videos_api(youtube, ch, max_videos, effective_days)
     print(f"{prefix} 수집 영상: {len(videos)}개", flush=True)
+    if dry_list:
+        have = sum(1 for v in videos if (Path(output_dir) / ch["slug"] / f"{v['vid']}.txt").exists())
+        print(f"{prefix} [dry-list] 전체 {len(videos)} / 자막 있음 {have} / 남음 {len(videos) - have}", flush=True)
+        return {"slug": ch["slug"], "ok": 0, "skip": have, "fail": 0, "stopped": "dry-list",
+                "remaining": len(videos) - have, "total": len(videos)}
 
     keyword = ch.get("keyword")
     if keyword:
@@ -573,14 +617,19 @@ def process_channel(ch, headless, output_dir, max_videos, days, skip_existing, d
     ok = skip = fail = 0
     total = len(videos)
 
+    failed = load_failed(output_dir, ch["slug"])
     videos_to_crawl = [
         v for v in videos
-        if not (skip_existing and (Path(output_dir) / ch["slug"] / f"{v['vid']}.txt").exists())
+        if not (skip_existing and (
+            (Path(output_dir) / ch["slug"] / f"{v['vid']}.txt").exists()
+            or failed.get(v["vid"], {}).get("count", 0) >= GIVEUP_FAILS
+        ))
     ]
     skip = total - len(videos_to_crawl)
+    pending = len(videos_to_crawl)
 
     # heavy 채널은 큐가 수백 건이라 스로틀 상태에서 소모 시간이 비례해 커진다 → 회차당 상한
-    cap = policy_for(ch["slug"]).get("crawl_cap", 0)
+    cap = crawl_cap or policy_for(ch["slug"]).get("crawl_cap", 0)
     if cap and len(videos_to_crawl) > cap:
         print(f"{prefix} 큐 cap {cap} 적용: {len(videos_to_crawl)} → {cap}", flush=True)
         videos_to_crawl = videos_to_crawl[:cap]
@@ -612,8 +661,12 @@ def process_channel(ch, headless, output_dir, max_videos, days, skip_existing, d
                     save_transcript(output_dir, ch["slug"], v["vid"], v["title"], v["url"], segments)
                     ok += 1
                     consec_fail = 0
+                    failed.pop(v["vid"], None)
                 else:
                     fail += 1
+                    f = failed.setdefault(v["vid"], {"count": 0, "title": v["title"], "url": v["url"]})
+                    f["count"] += 1
+                    f["last"] = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
                     consec_fail += 1
                     if consec_fail >= CONSEC_FAIL_LIMIT:
                         stopped = "circuit"
@@ -623,9 +676,14 @@ def process_channel(ch, headless, output_dir, max_videos, days, skip_existing, d
                     print(f"{prefix} 진행 {i}/{len(videos_to_crawl)} (ok={ok} skip={skip} fail={fail})", flush=True)
             context.close()
             browser.close()
+        save_failed(output_dir, ch["slug"], failed)
 
-    print(f"{prefix} 완료: ok={ok} skip={skip} fail={fail}" + (f" stopped={stopped}" if stopped else ""), flush=True)
-    return {"slug": ch["slug"], "ok": ok, "skip": skip, "fail": fail, "stopped": stopped}
+    remaining = max(pending - ok - fail, 0) + sum(
+        1 for v in videos_to_crawl if 0 < failed.get(v["vid"], {}).get("count", 0) < GIVEUP_FAILS)
+    print(f"{prefix} 완료: ok={ok} skip={skip} fail={fail} remaining={remaining}"
+          + (f" stopped={stopped}" if stopped else ""), flush=True)
+    return {"slug": ch["slug"], "ok": ok, "skip": skip, "fail": fail, "stopped": stopped,
+            "remaining": remaining, "total": total}
 
 
 def main():
@@ -636,22 +694,33 @@ def main():
     deadline = time.time() + args.max_minutes * 60 if args.max_minutes > 0 else None
     print(f"총 {len(channels)}개 채널, {workers} workers로 병렬 실행 (런 상한 {args.max_minutes or '무제한'}분)")
 
+    remaining_total = 0
+    clean = True
     with ProcessPoolExecutor(max_workers=workers) as executor:
         futures = {
             executor.submit(
                 process_channel, ch, args.headless, args.output_dir,
-                args.max_videos, args.days, skip_existing, deadline
+                args.max_videos, args.days, skip_existing, deadline,
+                args.dry_list, args.crawl_cap,
             ): ch for ch in channels
         }
         for future in as_completed(futures):
             ch = futures[future]
             try:
                 r = future.result()
+                remaining_total += r.get("remaining", 0)
+                if r.get("stopped") not in (None, "dry-list"):
+                    clean = False
                 print(f"[완료] {r['slug']}: ok={r['ok']} skip={r['skip']} fail={r['fail']}"
                       + (f" stopped={r['stopped']}" if r.get("stopped") else ""))
             except Exception as e:
+                clean = False
                 print(f"[실패] {ch['slug']}: {e}")
 
+    print(f"\n남은 영상 합계: {remaining_total}")
+    # 백필 크론(cron_food_backfill.sh)이 이 줄을 보고 스스로 멈춘다
+    if clean and remaining_total == 0 and not args.dry_list:
+        print("BACKFILL COMPLETE")
     print("\nALL DONE")
 
 
