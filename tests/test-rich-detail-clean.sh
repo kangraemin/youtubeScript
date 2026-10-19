@@ -6,7 +6,8 @@ cd "$(dirname "$0")/.."
 import sys
 sys.path[:0] = ["worker", "."]
 from restaurant_extractor import clean_detail, EXTRACT_PROMPT, PROMPT_VERSION
-assert PROMPT_VERSION.startswith("v3"), PROMPT_VERSION
+assert PROMPT_VERSION.startswith("v4"), PROMPT_VERSION
+assert "해요체" in EXTRACT_PROMPT and "~라는 평" in EXTRACT_PROMPT
 assert '"detail"' in EXTRACT_PROMPT
 d = clean_detail({
     "recommend": "강추", "verdict": "가" * 60, "price": "비싸다고 함", "parking": "언급 없음",
