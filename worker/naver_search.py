@@ -1,5 +1,6 @@
 import logging
 import os
+import html
 import re
 from difflib import SequenceMatcher
 import requests
@@ -61,7 +62,7 @@ API_URL = "https://openapi.naver.com/v1/search/local.json"
 
 
 def _strip_html(text: str) -> str:
-    return re.sub(r"<[^>]+>", "", text)
+    return html.unescape(re.sub(r"<[^>]+>", "", text))
 
 
 def _extract_region(address: str) -> str | None:
