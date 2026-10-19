@@ -124,18 +124,19 @@ import os, importlib.util
 os.environ['SUMMARY_CUTOFF_DAYS']='3650'
 spec=importlib.util.spec_from_file_location('g','scripts/get_next_unsummarized.py')
 m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-assert m.CUTOFF_DAYS==3650, m.CUTOFF_DAYS
+assert m.CUTOFF_OVERRIDE=='3650', m.CUTOFF_OVERRIDE
 \"
 "
 
-# TC-15 (regression): 미설정 시 기본 30 유지 — 기존 cron 동작 불변
-chk "TC-15 기본 30 유지" "
+# TC-15 (regression): 미설정 시 덮어쓰기 없음 — 채널 정책(summary_window_sql)을 따른다
+chk "TC-15 미설정=채널 정책" "
   .venv/bin/python -c \"
 import os, importlib.util
 os.environ.pop('SUMMARY_CUTOFF_DAYS', None)
 spec=importlib.util.spec_from_file_location('g','scripts/get_next_unsummarized.py')
 m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
-assert m.CUTOFF_DAYS==30, m.CUTOFF_DAYS
+assert m.CUTOFF_OVERRIDE is None, m.CUTOFF_OVERRIDE
+import inspect; assert 'summary_window_sql()' in inspect.getsource(m.main)
 \"
 "
 
@@ -153,10 +154,10 @@ chk "TC-18 workflow meta" "test -f .claude/workflows/summarize-batch.js && grep 
 # TC-19 (type-check): workflow 스크립트 구문
 chk "TC-19 workflow 문법" "node --check .claude/workflows/summarize-batch.js"
 
-# TC-20 (happy): 요약 절차 4요소가 에이전트 프롬프트에 포함
+# TC-20 (happy): 요약 절차 3요소가(기간은 채널 정책으로 옮겨져 프롬프트에서 빠짐) 에이전트 프롬프트에 포함
 chk "TC-20 절차 4요소" "
   W=.claude/workflows/summarize-batch.js
-  grep -q get_next_unsummarized \$W && grep -q screen_out \$W && grep -q save_summary \$W && grep -q SUMMARY_CUTOFF_DAYS \$W
+  grep -q get_next_unsummarized \$W && grep -q screen_out \$W && grep -q save_summary \$W
 "
 
 # TC-21 (negative): 에이전트 null 반환 시에도 집계가 깨지지 않음

@@ -25,7 +25,8 @@ check "TC-2 dry-run DB 미변경 ($BEFORE==$AFTER_DRY)" "[ \"$BEFORE\" = \"$AFTE
 # TC-3 (e2e): 실제 복구 시 NULL 카운트 감소 (소량 limit)
 .venv/bin/python scripts/backfill_published_at.py --channel shukaworld --limit 5 >/tmp/bf_run.log 2>&1
 AFTER_RUN=$(null_count)
-check "TC-3 실제 복구로 NULL 감소 ($BEFORE -> $AFTER_RUN)" "[ \"$AFTER_RUN\" -lt \"$BEFORE\" ]"
+# 이미 다 복구돼 NULL이 0이면 줄어들 게 없다 → 0 유지면 통과
+check "TC-3 실제 복구로 NULL 감소 ($BEFORE -> $AFTER_RUN)" "[ \"$AFTER_RUN\" -lt \"$BEFORE\" ] || [ \"$BEFORE\" -eq 0 -a \"$AFTER_RUN\" -eq 0 ]"
 
 echo "PASS=$PASS FAIL=$FAIL"
 [ "$FAIL" -eq 0 ]

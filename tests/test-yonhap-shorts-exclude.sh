@@ -31,7 +31,7 @@ assert _iso_dur_sec('PT45S')==45 and _iso_dur_sec('PT3M20S')==200 and _iso_dur_s
 assert _iso_dur_sec('PT0S')==0 and _iso_dur_sec(None)==0
 print('✅ duration 파서 OK')
 " || FAIL=1
-grep -q '_filter_by_min_duration' scripts/crawl_youtube_transcripts.py && echo "✅ 필터 함수 존재" || FAIL=1
+grep -q '_attach_duration' scripts/crawl_youtube_transcripts.py && echo "✅ 필터 함수 존재" || FAIL=1
 grep -q 'return _finalize(videos)' scripts/crawl_youtube_transcripts.py && echo "✅ get_channel_videos_api 연동" || FAIL=1
 
 echo "### TC3: 큐 SUMMARY_SLUGS 사용"

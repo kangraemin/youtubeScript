@@ -24,8 +24,8 @@ keys=set(r[0].keys())
 assert 'headline' in keys and 'n_buys' in keys and 'summary' not in keys, keys
 print('feed_summaries keys', sorted(keys))\""
 
-# TC-5 (regression): InfiniteList 브라우즈 모드가 feed_summaries RPC 사용
-chk "TC-5 피드 RPC 전환" "grep -q 'feed_summaries' web/components/InfiniteList.tsx"
+# TC-5 (regression): 브라우즈 모드가 feed_summaries RPC 사용 (InfiniteList → /api/feed → lib/feed.ts)
+chk "TC-5 피드 RPC 전환" "grep -q '/api/feed' web/components/InfiniteList.tsx && grep -q 'feed_summaries' web/lib/feed.ts"
 
 # TC-6 (regression): VideoCard + 타입이 경량필드(n_buys) 지원
 chk "TC-6 VideoCard 양립" "grep -q 'n_buys' web/components/VideoCard.tsx && grep -q 'n_buys' web/lib/supabase.ts"

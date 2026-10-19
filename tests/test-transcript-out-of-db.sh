@@ -38,13 +38,13 @@ print('get_next ok:', 'empty' if d.get('empty') else d['transcript_path'])\""
 # TC-5 (negative): upload row dict에 transcript 본문 키 없음(메타전용) — load_channel이 has_transcript만 넣음
 chk "TC-5 메타전용(transcript 본문 미upsert)" "grep -q 'has_transcript' scripts/upload_transcripts.py && ! grep -qE '\"transcript\"[[:space:]]*:[[:space:]]*transcript' scripts/upload_transcripts.py"
 
-# TC-6 (boundary): has_transcript=true·로컬파일 없는 가짜행 주입 시 get_next가 park(2099)+무한루프 없음. 끝나면 원복.
+# TC-6 (boundary): has_transcript=true·로컬파일 없는 가짜행(어제 날짜 — 요약 기간 안이어야 claim됨) 주입 시 get_next가 park(2099)+무한루프 없음. 끝나면 원복.
 chk "TC-6 로컬파일 없으면 park + 무한루프 없음" ".venv/bin/python - <<'PY'
-import subprocess, time
+import subprocess, time, datetime
 from worker.supabase_client import get_client
 db=get_client()
 VID='__test_missing_local__'
-db.table('transcripts').upsert({'vid':VID,'channel':'t','channel_slug':'moneycomics','title':'t','published_at':'2026-06-01','has_transcript':True,'summary':None,'summary_started_at':None},on_conflict='vid').execute()
+db.table('transcripts').upsert({'vid':VID,'channel':'t','channel_slug':'moneycomics','title':'t','published_at':(datetime.date.today()-datetime.timedelta(days=1)).isoformat(),'has_transcript':True,'summary':None,'summary_started_at':None},on_conflict='vid').execute()
 try:
     t0=time.time()
     subprocess.run(['.venv/bin/python','scripts/get_next_unsummarized.py'],capture_output=True,text=True,timeout=120)

@@ -12,8 +12,8 @@ from scripts.channel_config import (policy_for, category_of, SUMMARY_SLUGS,
     INVEST_MEDIA_SLUGS, CULTURE_SLUGS, EXCLUDED_FROM_SUMMARY)
 assert category_of('mk_wallstreet') == 'invest_media'
 assert category_of('sbs_gyoyangi') == 'culture'
-assert policy_for('mk_wallstreet') == {'days':30,'summary':True,'min_duration_sec':180}
-assert policy_for('sbs_gyoyangi') == {'days':30,'summary':True,'min_duration_sec':180}
+assert policy_for('mk_wallstreet') == {'days':30,'summary':True,'min_duration_sec':180,'summary_days':30}
+assert policy_for('sbs_gyoyangi') == {'days':30,'summary':True,'min_duration_sec':180,'summary_days':0}  # 교양은 요약 기간 제한 없음
 assert 'mk_wallstreet' in SUMMARY_SLUGS and 'sbs_gyoyangi' in SUMMARY_SLUGS
 assert 'mk_wallstreet' not in EXCLUDED_FROM_SUMMARY and 'sbs_gyoyangi' not in EXCLUDED_FROM_SUMMARY
 print('OK')

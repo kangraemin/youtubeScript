@@ -16,11 +16,13 @@ chk "TC-2 transcript 본문 update 제거" "! grep -qE 'update\(\{\"transcript\"
 chk "TC-3 has_transcript 기준" "grep -q 'eq(.has_transcript., False)' scripts/backfill_from_db.py && grep -q 'has_transcript.: True' scripts/backfill_from_db.py"
 
 # TC-4 (boundary): 실제 대상 건수가 전체(4000+)가 아니라 진짜 누락분(소수)인지 — 전체 재크롤 방지 증명
+# 먹방 채널은 6년치 백필 목록이 먼저 들어와 자막 대기 행이 많다 → 경제·교양 채널만 센다
 chk "TC-4 대상이 전체 아님(재크롤 방지)" ".venv/bin/python -c \"
 from worker.supabase_client import get_client
+from scripts.channel_config import FOOD_SLUGS
 db=get_client()
-falsec=db.table('transcripts').select('vid',count='exact',head=True).eq('has_transcript',False).execute().count
-total=db.table('transcripts').select('vid',count='exact',head=True).execute().count
+falsec=db.table('transcripts').select('vid',count='exact',head=True).eq('has_transcript',False).not_.in_('channel_slug',FOOD_SLUGS).execute().count
+total=db.table('transcripts').select('vid',count='exact',head=True).not_.in_('channel_slug',FOOD_SLUGS).execute().count
 print('has_transcript=false', falsec, '/ total', total)
 assert falsec < total*0.2, ('대상이 너무 많음=전체재크롤 위험', falsec, total)\""
 
