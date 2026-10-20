@@ -43,6 +43,25 @@ logger = logging.getLogger("pipeline")
 ROOT = Path(__file__).resolve().parent.parent
 TRANSCRIPTS = ROOT / "rawdata" / "transcripts"
 USAGE_LOG = ROOT / "rawdata" / "reports" / "pipeline-usage.jsonl"
+# 추출 결과를 DB에 넣기 전에 먼저 여기에 둔다. DB가 죽어도 다시 추출하지 않고 이걸 쓴다(2026-10-20 DB 5시간 장애)
+EXTRACT_DIR = ROOT / "rawdata" / "extract"
+
+
+def _cached_extract(vid: str) -> list[dict] | None:
+    f = EXTRACT_DIR / f"{vid}.json"
+    if not f.exists():
+        return None
+    try:
+        d = json.loads(f.read_text(encoding="utf-8"))
+    except ValueError:
+        return None
+    return d["restaurants"] if d.get("prompt_version") == PROMPT_VERSION else None
+
+
+def _keep_extract(vid: str, restaurants: list[dict]) -> None:
+    EXTRACT_DIR.mkdir(parents=True, exist_ok=True)
+    (EXTRACT_DIR / f"{vid}.json").write_text(
+        json.dumps({"prompt_version": PROMPT_VERSION, "restaurants": restaurants}, ensure_ascii=False), encoding="utf-8")
 MAX_RETRY = 3
 FINISHED = ("done", "no_restaurant")
 
@@ -235,22 +254,27 @@ def process_video(db, video: dict, stats: dict) -> list[dict]:
         queue_set(db, video, "no_transcript")
         return saved
 
-    try:
-        restaurants, usage = extract_restaurants(transcript, title=video.get("title", ""),
-                                                 description=video.get("description", ""))
-    except ExtractBlocked:
-        raise
-    except ExtractError as e:
-        logger.warning("  추출 실패: %s", e)
-        stats["failed"] += 1
-        queue_set(db, video, "failed", error=str(e)[:500])
-        return saved
-    stats["input_tokens"] += usage["input_tokens"]
-    stats["output_tokens"] += usage["output_tokens"]
-    USAGE_LOG.parent.mkdir(parents=True, exist_ok=True)
-    with USAGE_LOG.open("a", encoding="utf-8") as f:
-        f.write(json.dumps({"at": datetime.now().isoformat(timespec="seconds"), "video_id": vid,
-                            "restaurants": len(restaurants), **usage}) + "\n")
+    restaurants = _cached_extract(vid)
+    if restaurants is not None:
+        logger.info("  저장해 둔 추출 결과를 쓴다")
+    else:
+        try:
+            restaurants, usage = extract_restaurants(transcript, title=video.get("title", ""),
+                                                     description=video.get("description", ""))
+        except ExtractBlocked:
+            raise
+        except ExtractError as e:
+            logger.warning("  추출 실패: %s", e)
+            stats["failed"] += 1
+            queue_set(db, video, "failed", error=str(e)[:500])
+            return saved
+        _keep_extract(vid, restaurants)
+        stats["input_tokens"] += usage["input_tokens"]
+        stats["output_tokens"] += usage["output_tokens"]
+        USAGE_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with USAGE_LOG.open("a", encoding="utf-8") as f:
+            f.write(json.dumps({"at": datetime.now().isoformat(timespec="seconds"), "video_id": vid,
+                                "restaurants": len(restaurants), **usage}) + "\n")
 
     # 설명란 naver.me 링크 = 유튜버가 직접 적은 가게 → 이름이 맞으면 그 플레이스 정보를 쓴다(확신 high)
     desc_places = parse_description_places(video.get("description", ""))
