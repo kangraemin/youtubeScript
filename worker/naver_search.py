@@ -3,6 +3,9 @@ import os
 import html
 import re
 from difflib import SequenceMatcher
+import threading
+import time
+
 import requests
 
 logger = logging.getLogger(__name__)
@@ -79,6 +82,21 @@ def _hint_regions(hint: str | None) -> list[str]:
     return [kw for kw in REGION_KEYWORDS if kw in hint]
 
 
+# 파이프라인이 영상 여러 개를 동시에 처리하면 초당 호출 한도를 넘어 429가 난다(2026-10-20) — 호출 간격을 둔다
+_GAP = 0.15
+_gate = threading.Lock()
+_last = 0.0
+
+
+def _throttle():
+    global _last
+    with _gate:
+        wait = _last + _GAP - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _last = time.monotonic()
+
+
 def _search_candidates(query: str) -> list[dict]:
     """네이버 Local Search에서 후보 5개를 받는다."""
     headers = {
@@ -86,10 +104,15 @@ def _search_candidates(query: str) -> list[dict]:
         "X-Naver-Client-Secret": os.environ["NAVER_SEARCH_CLIENT_SECRET"],
     }
     try:
-        resp = requests.get(
-            API_URL, headers=headers,
-            params={"query": query, "display": 5}, timeout=10,
-        )
+        for attempt in range(4):
+            _throttle()
+            resp = requests.get(
+                API_URL, headers=headers,
+                params={"query": query, "display": 5}, timeout=10,
+            )
+            if resp.status_code != 429 or attempt == 3:
+                break
+            time.sleep(1 + attempt)
         resp.raise_for_status()
         return resp.json().get("items", [])
     except Exception as e:

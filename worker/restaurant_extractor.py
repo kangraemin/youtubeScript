@@ -7,9 +7,7 @@ import json
 import logging
 import os
 import re
-import shutil
 import subprocess
-import tempfile
 
 from chain_blacklist import CHAIN_NAMES
 
@@ -23,11 +21,7 @@ MODEL = os.environ.get("EXTRACT_MODEL", "sonnet")
 FLAGS = ["--output-format", "json", "--system-prompt", "먹방 자막에서 방문 식당을 뽑아 JSON 하나만 출력하는 추출기다.",
          "--tools", "", "--strict-mcp-config", "--setting-sources", "", "--no-session-persistence"]
 MAX_TRANSCRIPT_CHARS = 40_000
-# claude -p가 로그인 만료·한도로 막히면 codex exec로 넘어간다. EXTRACT_FALLBACK=off면 끈다.
-CODEX = None if os.environ.get("EXTRACT_FALLBACK") == "off" else shutil.which("codex") or (
-    "/opt/homebrew/bin/codex" if os.path.exists("/opt/homebrew/bin/codex") else None)
-CODEX_MODEL = os.environ.get("EXTRACT_CODEX_MODEL", "")
-_claude_blocked = False
+# 요약은 claude -p로만 한다. 막히면 그 회차를 멈춘다(Codex로 넘기지 않는다, 사용자 지시 2026-10-20)
 
 
 # .env.local에 ANTHROPIC_API_KEY가 있으면 claude -p가 구독 대신 API 키로 과금한다(실측: "Credit balance is too low").
@@ -187,25 +181,6 @@ def _run_claude(prompt: str) -> tuple[str, dict]:
     return res.get("result", ""), usage
 
 
-def _run_codex(prompt: str) -> tuple[str, dict]:
-    """claude -p가 막혔을 때 쓰는 예비 추출기(Codex 구독 CLI). 토큰 수는 CLI가 주지 않아 0으로 둔다."""
-    with tempfile.NamedTemporaryFile("r", suffix=".txt") as out:
-        try:
-            r = subprocess.run([CODEX, "exec", "--skip-git-repo-check", "--ephemeral", "-s", "read-only",
-                                *(["-m", CODEX_MODEL] if CODEX_MODEL else []), "-o", out.name, "-"],
-                               input=prompt, capture_output=True, text=True, timeout=600, cwd="/tmp",
-                               env=_cli_env())
-        except subprocess.TimeoutExpired as e:
-            raise ExtractError("codex exec 시간 초과") from e
-        except OSError as e:
-            raise ExtractError(f"codex exec 실행 실패: {e}") from e
-        text = out.read()
-    if r.returncode != 0 or not text.strip():
-        msg = (r.stderr or r.stdout)[-200:]
-        raise (ExtractBlocked if _BLOCKED.search(msg) else ExtractError)(f"codex exec: {msg}")
-    return text, {"input_tokens": 0, "output_tokens": 0}
-
-
 def extract_restaurants(
     transcript_segments: list[dict],
     title: str = "",
@@ -224,19 +199,7 @@ def extract_restaurants(
         title=title or "(제목 없음)", description=desc_text, transcript=transcript_text,
     )
 
-    global _claude_blocked
-    if _claude_blocked and CODEX:
-        text, usage = _run_codex(prompt)
-    else:
-        try:
-            text, usage = _run_claude(prompt)
-        except ExtractBlocked as e:
-            # 로그인 만료·한도면 이 프로세스에선 codex로만 돈다(영상마다 claude를 다시 두드리지 않는다)
-            if not CODEX:
-                raise
-            logger.warning("claude -p 막힘 → codex exec로 전환: %s", e)
-            _claude_blocked = True
-            text, usage = _run_codex(prompt)
+    text, usage = _run_claude(prompt)
 
     m = re.search(r"\{.*\}", text, re.S)
     if not m:

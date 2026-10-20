@@ -8,7 +8,7 @@ while pgrep -f "worker/pipeline.py" >/dev/null; do sleep 20; done
 crashed=0
 for i in $(seq 1 "${DRAIN_MAX_ROUNDS:-100}"); do
   before=$(grep -c '^{"videos"' "$LOG")
-  MUKMAP_MAX_VIDEOS="${DRAIN_BATCH:-100}" MUKMAP_MAX_MINUTES=55 bash scripts/cron_mukmap.sh
+  MUKMAP_MAX_VIDEOS="${DRAIN_BATCH:-400}" MUKMAP_MAX_MINUTES=55 MUKMAP_WORKERS="${DRAIN_WORKERS:-8}" bash scripts/cron_mukmap.sh
   if [ "$(grep -c '^{"videos"' "$LOG")" -eq "$before" ]; then
     crashed=$((crashed + 1))
     echo "[drain $i] 결과 줄 없음(회차 비정상 종료 또는 락 스킵) $crashed/3"

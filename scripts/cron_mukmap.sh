@@ -1,5 +1,5 @@
 #!/bin/bash
-# MukMap 맛집 파이프라인 — 매시 :20. 자막 → claude -p 추출(막히면 codex exec) → 네이버 매칭 → Supabase.
+# MukMap 맛집 파이프라인 — 매시 :20. 자막 → claude -p 추출 → 네이버 매칭 → Supabase.
 # 쌓인 자막을 한 번에 비울 땐 MUKMAP_MAX_VIDEOS/MUKMAP_MAX_MINUTES로 회차 크기를 키운다(scripts/drain_mukmap.sh).
 # 구독 한도를 아끼려고 회차당 10개만 처리한다(사용자 지시 2026-10-19). 6년치 백필은 2~3주에 걸쳐 따라간다.
 # 하루 첫 회차에는 어제 리포트를 만든다.
@@ -24,11 +24,13 @@ fi
 export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
 # cron엔 계정 경로가 없어 기본 계정(~/.claude)으로 돈다 — 그 계정은 로그인 만료·주간 한도로 전부 실패했다(2026-10-19)
 export CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-/Users/ram/.config/claude-accounts/personal}"
+# 기본 계정(~/.claude)은 CLAUDE_CONFIG_DIR를 비워야 로그인된다(경로를 직접 넣으면 "Not logged in", 2026-10-20). MUKMAP_CLAUDE=default로 고른다
+[ "${MUKMAP_CLAUDE:-}" = default ] && unset CLAUDE_CONFIG_DIR
 # 로그인 토큰은 키체인에 있고 USER로 찾는다. cron엔 USER가 없어 "Not logged in"으로 전부 실패했다(2026-10-20)
 export USER="${USER:-$(id -un)}"
 
 echo "[$(date '+%F %T')] 시작" >> "$LOG"
-.venv/bin/python worker/pipeline.py --max-videos "${MUKMAP_MAX_VIDEOS:-10}" --max-minutes "${MUKMAP_MAX_MINUTES:-50}" >> "$LOG" 2>&1
+.venv/bin/python worker/pipeline.py --max-videos "${MUKMAP_MAX_VIDEOS:-10}" --max-minutes "${MUKMAP_MAX_MINUTES:-50}" --workers "${MUKMAP_WORKERS:-1}" >> "$LOG" 2>&1
 
 YESTERDAY=$(date -v-1d '+%F')
 if [ ! -f "rawdata/reports/daily-$YESTERDAY.md" ]; then

@@ -17,7 +17,9 @@ import logging
 import os
 import re
 import sys
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -340,6 +342,7 @@ def main():
     ap.add_argument("--max-minutes", type=int, default=50, help="회차 상한(분). 0 = 무제한")
     ap.add_argument("--video-id", help="이 영상 하나만")
     ap.add_argument("--dry-run", action="store_true", help="DB 쓰기 없이 결과 JSON만 출력")
+    ap.add_argument("--workers", type=int, default=1, help="동시에 처리할 영상 수")
     args = ap.parse_args()
 
     load_env()
@@ -366,31 +369,66 @@ def main():
                  naver_calls=0, input_tokens=0, output_tokens=0)
     deadline = time.time() + args.max_minutes * 60 if args.max_minutes else None
     results = {}
-    for v in todo:
-        if deadline and time.time() >= deadline:
-            logger.info("회차 상한 도달 — 남은 영상은 다음 회차로")
-            break
+    counters = list(stats)  # stats["blocked"](문자열)가 끼어도 합산 키는 숫자만
+    lock = threading.Lock()
+    stop = threading.Event()
+    local = threading.local()
+
+    def client():
+        if args.dry_run:
+            return None
+        if getattr(local, "db", None) is None:
+            local.db = db if args.workers == 1 else get_client()
+        return local.db
+
+    def run_one(v):
+        if stop.is_set() or (deadline and time.time() >= deadline):
+            return
+        mine = dict.fromkeys(counters, 0)
         try:
             for attempt in range(3):
                 try:
-                    results[v["video_id"]] = process_video(db, v, stats)
+                    res = process_video(client(), v, mine)
                     break
                 except httpx.TransportError as e:
                     # Supabase HTTP/2 연결이 가끔 SSL 오류(bad record mac)로 끊긴다 — 연결을 새로 열고 같은 영상을 다시 한다
                     logger.warning("DB 연결 오류(%d/3): %s — %s", attempt + 1, v["video_id"], e)
                     time.sleep(5 * (attempt + 1))
-                    db_read = get_client()
-                    db = None if args.dry_run else db_read
+                    local.db = None if args.dry_run else get_client()
             else:
                 logger.error("DB 연결 오류 3회 — 이 영상은 건너뛰고 다음 회차에 다시 한다: %s", v["video_id"])
-                stats["failed"] += 1
-                continue
+                mine["failed"] += 1
+                res = None
         except ExtractBlocked as e:
             # 로그인 만료·한도 초과는 다음 영상도 똑같이 실패한다. 큐는 그대로 두고 다음 회차에 다시 한다
             logger.error("추출 중단(이번 회차 종료): %s", e)
-            stats["blocked"] = str(e)[:200]
-            break
-        stats["videos"] += 1
+            stop.set()
+            with lock:
+                stats["blocked"] = str(e)[:200]
+            return
+        except Exception:
+            # 동시에 돌 때 같은 가게를 두 영상이 함께 넣으면 중복 키로 실패할 수 있다 — 다음 회차에 다시 한다
+            logger.exception("영상 처리 실패 — 다음 회차에 다시 한다: %s", v["video_id"])
+            mine["failed"] += 1
+            res = None
+        with lock:
+            for k, n in mine.items():
+                stats[k] += n
+            if res is not None:
+                results[v["video_id"]] = res
+                stats["videos"] += 1
+
+    if args.workers == 1:
+        for v in todo:
+            run_one(v)
+            if stop.is_set() or (deadline and time.time() >= deadline):
+                break
+    else:
+        # claude -p 추출이 영상당 수십 초라 여러 영상을 동시에 처리한다
+        with ThreadPoolExecutor(max_workers=args.workers) as pool:
+            list(pool.map(run_one, todo))
+    if deadline and time.time() >= deadline:
+        logger.info("회차 상한 도달 — 남은 영상은 다음 회차로")
 
     print(json.dumps(stats, ensure_ascii=False))
     if args.dry_run:
