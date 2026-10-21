@@ -1,5 +1,5 @@
 #!/bin/bash
-# MukMap 맛집 파이프라인 — 매시 :20. 자막 → claude -p 추출 → 네이버 매칭 → Supabase.
+# MukMap 맛집 파이프라인 — 매시 :20 (launchd com.ram.mukmap. cron은 키체인을 못 읽어 'Not logged in'으로 전부 실패해서 2026-10-22 옮김). 자막 → claude -p 추출 → 네이버 매칭 → Supabase.
 # 쌓인 자막을 한 번에 비울 땐 MUKMAP_MAX_VIDEOS/MUKMAP_MAX_MINUTES로 회차 크기를 키운다(scripts/drain_mukmap.sh).
 # 구독 한도를 아끼려고 회차당 10개만 처리한다(사용자 지시 2026-10-19). 6년치 백필은 2~3주에 걸쳐 따라간다.
 # 하루 첫 회차에는 어제 리포트를 만든다.
