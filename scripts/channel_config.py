@@ -45,6 +45,8 @@ FOOD_SLUGS = [
     "heebab",
     "sungsikyung",
     "chureupkyeon",
+    "ttoganjip",
+    "jeongyukwang",
 ]
 
 # 영상 너무 많은 별도 채널 (요약 제외, 수집은 함)
@@ -91,6 +93,10 @@ CHANNELS = [
     {"id": "UCl23-Cci_SMqyGXE1T_LYUg", "slug": "sungsikyung",        "name": "먹을텐데",           "tab": "videos",
      "title_include": "먹을텐데"},
     {"id": "UCqVjsRNWQM-ZBl27Pp8qI5g", "slug": "chureupkyeon",       "name": "츄릅켠",             "tab": "videos", "handle": "chureupkyeon"},
+    # 먹방 신규 (2026-10-22, 사용자 지시). 또간집은 풍자의 스튜디오 수제 채널 안 시리즈라 제목에 "또간집"이 있는 회차만 받는다.
+    {"id": "UC4ZA57iJrf73bJlApKFeLRw", "slug": "ttoganjip",          "name": "또간집",             "tab": "videos",
+     "title_include": "또간집"},
+    {"id": "UC1oXmhvYHVI2bApphh3IzuQ", "slug": "jeongyukwang",       "name": "정육왕",             "tab": "videos", "handle": "meatcreator"},
 ]
 
 

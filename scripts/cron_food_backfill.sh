@@ -23,7 +23,8 @@ if [ -z "${FOOD_BACKFILL_LOCK_HELD:-}" ]; then
 fi
 
 source .env.local 2>/dev/null || true
-FOOD="dulcinea_studio,tzuyang,jaesunrang,kimjjamppong,kimsawon,heebab,sungsikyung,chureupkyeon"
+# 채널 목록은 scripts/channel_config.py FOOD_SLUGS 하나만 쓴다(사본을 두면 새 채널이 백필에서 빠진다)
+FOOD=$(.venv/bin/python -c "from scripts.channel_config import FOOD_SLUGS; print(','.join(FOOD_SLUGS))")
 
 echo "[$(date '+%F %T')] 시작" >> "$LOG"
 OUT=$(.venv/bin/python scripts/crawl_youtube_transcripts.py --channel "$FOOD" --days 2190 \
