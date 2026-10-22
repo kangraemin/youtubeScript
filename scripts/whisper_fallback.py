@@ -12,6 +12,7 @@ Usage:
 """
 import argparse
 import random
+import re
 import subprocess
 import sys
 import tempfile
@@ -27,6 +28,22 @@ from scripts.crawl_youtube_transcripts import (  # noqa: E402
 
 YT_DLP = "/opt/homebrew/bin/yt-dlp"
 MODEL = "mlx-community/whisper-large-v3-turbo"
+FFMPEG = "/opt/homebrew/bin/ffmpeg"
+# 2배속 + 이전 문맥 끔: 15분 영상 452초 → 47초, 같은 말 되풀이 110줄 → 27줄(2026-10-22 실측). 1.5배속은 외국 글자가 섞여 더 나빴다.
+SPEED = 2.0
+FOREIGN = re.compile(r"[\u0400-\u04FF\u0600-\u06FF\u0E00-\u0E7F\uFFFD]")  # 키릴·아랍·태국 글자, 깨진 글자
+
+
+def clean_segments(segs: list[dict], speed: float) -> list[dict]:
+    """빠르게 돌린 시각을 원래 시각으로 되돌리고, 빈 줄·바로 앞과 같은 말·외국 글자가 섞인 줄을 버린다."""
+    out, prev = [], None
+    for s in segs:
+        text = s.get("text", "").strip()
+        if not text or text == prev or FOREIGN.search(text):
+            continue
+        out.append({"timestamp": _fmt_ts(s["start"] * speed), "text": text})
+        prev = text
+    return out
 
 
 def candidates(out_dir: str) -> list[dict]:
@@ -73,28 +90,36 @@ def transcribe(vid: str, slug: str, title: str, url: str, out_dir: str) -> bool:
 
     url = url or f"https://www.youtube.com/watch?v={vid}"
     with tempfile.TemporaryDirectory() as tmp:
-        audio = Path(tmp) / f"{vid}.m4a"
+        audio = Path(tmp) / "a"
         # 쿠키 없이 먼저 받는다. --cookies-from-browser chrome은 키체인 확인 창을 기다리며 15분 넘게 멈췄다(2026-10-19 실측).
         # 연령 제한 등으로 실패할 때만 쿠키를 붙여 짧게 한 번 더 시도한다.
         err = ""
         for extra, limit in (([], 600), (["--cookies-from-browser", "chrome"], 120)):
             try:
                 r = subprocess.run(
-                    [YT_DLP, "-x", "--audio-format", "m4a", *extra,
-                     "--no-playlist", "-q", "-o", str(audio), url],
+                    # m4a로 다시 바꾸지 않는다: 변환만 6분 걸렸다. whisper는 webm을 그대로 읽는다
+                    [YT_DLP, "-f", "bestaudio", *extra,
+                     "--no-playlist", "-q", "-o", f"{audio}.%(ext)s", url],
                     capture_output=True, text=True, timeout=limit,
                 )
                 err = r.stderr.strip()[-200:]
             except subprocess.TimeoutExpired:
                 err = f"timeout {limit}s"
-            if audio.exists():
+            got = sorted(Path(tmp).glob("a.*"))
+            if got:
                 break
-        if not audio.exists():
+        if not got:
             print(f"  [whisper] 오디오 받기 실패 {vid}: {err}", flush=True)
             return False
-        res = mlx_whisper.transcribe(str(audio), path_or_hf_repo=MODEL, language="ko")
-    segs = [{"timestamp": _fmt_ts(s["start"]), "text": s["text"].strip()}
-            for s in res.get("segments", []) if s.get("text", "").strip()]
+        fast = Path(tmp) / "fast.webm"
+        r = subprocess.run([FFMPEG, "-y", "-v", "error", "-i", str(got[0]), "-filter:a", f"atempo={SPEED}",
+                            "-c:a", "libopus", str(fast)], capture_output=True, text=True, timeout=300)
+        if r.returncode:
+            print(f"  [whisper] 배속 변환 실패 {vid}: {r.stderr.strip()[-200:]}", flush=True)
+            return False
+        res = mlx_whisper.transcribe(str(fast), path_or_hf_repo=MODEL, language="ko",
+                                     condition_on_previous_text=False)
+    segs = clean_segments(res.get("segments", []), SPEED)
     if not segs:
         return False
     if not title:

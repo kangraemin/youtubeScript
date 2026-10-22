@@ -3,7 +3,7 @@
 # WHISPER_SHARDS개 프로세스가 영상을 나눠 받고(겹치지 않음), 그동안 10분마다 쌓인 자막을 맛집 추출(drain_mukmap.sh, 8개 동시)로 넘긴다.
 # 사용: nohup bash scripts/whisper_drain.sh > rawdata/reports/_whisper_drain.out 2>&1 &
 cd /Users/ram/programming/vibecoding/youtubeScript
-N="${WHISPER_SHARDS:-3}"
+N="${WHISPER_SHARDS:-2}"
 pids=()
 for i in $(seq 0 $((N - 1))); do
   .venv/bin/python scripts/whisper_fallback.py --all-missing --max-videos 0 --shard "$i/$N" --gap "${WHISPER_GAP:-10}" \
