@@ -7,6 +7,7 @@ yt-dlp로 오디오만 내려받고(브라우저 쿠키 사용), mlx-whisper lar
 
 Usage:
     python scripts/whisper_fallback.py --max-videos 5
+    python scripts/whisper_fallback.py --all-missing --shard 0/3   # 자막이 IP 차단으로 안 받아질 때 남은 먹방 영상 전체(3개 프로세스로 나눠 받기)
     python scripts/whisper_fallback.py --vid QWY3eNslYn0 --slug chureupkyeon --force
 """
 import argparse
@@ -19,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.channel_config import FOOD_SLUGS  # noqa: E402
+from scripts.channel_config import FOOD_SLUGS, food_channels, is_compilation  # noqa: E402
 from scripts.crawl_youtube_transcripts import (  # noqa: E402
     GIVEUP_FAILS, _fmt_ts, load_failed, save_failed, save_transcript,
 )
@@ -38,6 +39,33 @@ def candidates(out_dir: str) -> list[dict]:
                 continue
             out.append({"slug": slug, "vid": vid, "title": f.get("title", ""), "url": f.get("url", "")})
     return out
+
+
+def all_missing(out_dir: str, channels: list[str] | None = None) -> list[dict]:
+    """먹방 채널 6년치 영상 중 txt가 없는 것 전부(모아보기·2시간 초과·whisper 실패 제외). 목록은 Data API라 IP 차단과 무관하다."""
+    from googleapiclient.discovery import build
+    from scripts.crawl_youtube_transcripts import _load_env_key, get_channel_videos_api
+    import os
+    yt = build("youtube", "v3", developerKey=os.environ.get("YOUTUBE_API_KEY") or _load_env_key(".env.local", "YOUTUBE_API_KEY"))
+    out = []
+    for ch in food_channels():
+        if channels and ch["slug"] not in channels:
+            continue
+        failed = load_failed(out_dir, ch["slug"])
+        for v in get_channel_videos_api(yt, ch, 0, 2190):
+            if (Path(out_dir) / ch["slug"] / f"{v['vid']}.txt").exists() or failed.get(v["vid"], {}).get("whisper_failed"):
+                continue
+            if is_compilation(v.get("title", ""), v.get("duration_sec", 0)):
+                continue
+            out.append({"slug": ch["slug"], "vid": v["vid"], "title": v.get("title", ""), "url": v.get("url", "")})
+    return out
+
+
+def shard(items: list[dict], spec: str) -> list[dict]:
+    """'i/n' → vid 해시로 n등분한 것 중 i번째. 프로세스마다 겹치지 않게 나눈다."""
+    import zlib
+    i, n = (int(x) for x in spec.split("/"))
+    return [c for c in items if zlib.crc32(c["vid"].encode()) % n == i]
 
 
 def transcribe(vid: str, slug: str, title: str, url: str, out_dir: str) -> bool:
@@ -83,6 +111,10 @@ def main():
     p.add_argument("--vid", help="이 영상 하나만 처리")
     p.add_argument("--slug", help="--vid와 함께 쓰는 채널 slug")
     p.add_argument("--force", action="store_true", help="txt가 있어도 다시 받아 적는다(--vid 전용)")
+    p.add_argument("--all-missing", action="store_true", help="실패 기록과 상관없이 txt 없는 먹방 영상 전부")
+    p.add_argument("--channel", help="--all-missing 대상 slug(쉼표 구분)")
+    p.add_argument("--shard", default="0/1", help="i/n — n개 프로세스로 나눠 돌릴 때 이 프로세스 몫")
+    p.add_argument("--gap", type=float, default=30, help="오디오 다운로드 사이 평균 대기 초")
     args = p.parse_args()
 
     if args.vid:
@@ -95,18 +127,30 @@ def main():
         ok = transcribe(args.vid, args.slug, "", "", args.output_dir)
         sys.exit(0 if ok else 1)
 
-    todo = candidates(args.output_dir)[: args.max_videos]
-    print(f"whisper 대상 {len(todo)}개", flush=True)
+    if args.all_missing:
+        todo = shard(all_missing(args.output_dir, args.channel.split(",") if args.channel else None), args.shard)
+    else:
+        todo = candidates(args.output_dir)
+    todo = todo[: args.max_videos] if args.max_videos > 0 else todo
+    print(f"whisper 대상 {len(todo)}개 (shard {args.shard})", flush=True)
+    done = 0
     for i, c in enumerate(todo):
         if i:
-            time.sleep(random.uniform(20, 40))  # 오디오 다운로드 간격 — 연속 요청으로 막히지 않게
+            time.sleep(random.uniform(args.gap * 0.5, args.gap * 1.5))  # 오디오 다운로드 간격 — 연속 요청으로 막히지 않게
+        if (Path(args.output_dir) / c["slug"] / f"{c['vid']}.txt").exists():  # 그 사이 크롤러가 받았다
+            continue
         ok = transcribe(c["vid"], c["slug"], c["title"], c["url"], args.output_dir)
+        done += ok
         failed = load_failed(args.output_dir, c["slug"])
         if ok:
             failed.pop(c["vid"], None)
-        elif c["vid"] in failed:
-            failed[c["vid"]]["whisper_failed"] = True  # 다시 시도하지 않는다(삭제·연령제한 영상 등)
+        else:
+            # 다시 시도하지 않는다(삭제·연령제한 영상 등)
+            failed.setdefault(c["vid"], {"count": 0, "title": c["title"], "url": c["url"]})["whisper_failed"] = True
         save_failed(args.output_dir, c["slug"], failed)
+        if (i + 1) % 10 == 0:
+            print(f"[whisper {args.shard}] 진행 {i + 1}/{len(todo)} ok={done}", flush=True)
+    print(f"[whisper {args.shard}] 끝 ok={done}/{len(todo)}", flush=True)
 
 
 if __name__ == "__main__":

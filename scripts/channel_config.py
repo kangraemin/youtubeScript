@@ -47,6 +47,9 @@ FOOD_SLUGS = [
     "chureupkyeon",
     "ttoganjip",
     "jeongyukwang",
+    "higaengs",
+    "seoul_namzaa",
+    "rawfisheater",
 ]
 
 # 영상 너무 많은 별도 채널 (요약 제외, 수집은 함)
@@ -97,6 +100,10 @@ CHANNELS = [
     {"id": "UC4ZA57iJrf73bJlApKFeLRw", "slug": "ttoganjip",          "name": "또간집",             "tab": "videos",
      "title_include": "또간집"},
     {"id": "UC1oXmhvYHVI2bApphh3IzuQ", "slug": "jeongyukwang",       "name": "정육왕",             "tab": "videos", "handle": "meatcreator"},
+    # 먹방 신규 (2026-10-22, 사용자 지시)
+    {"id": "UC86GzuZXRb7aZnhnnUA3IAg", "slug": "higaengs",           "name": "하이갱스",           "tab": "videos", "handle": "higaengs"},
+    {"id": "UCB6rLbWzClupm4FshWTnPRA", "slug": "seoul_namzaa",       "name": "서울 사는 남자",     "tab": "videos", "handle": "seoul_namzaa"},
+    {"id": "UCoLPofyAZuuq6v4EWrWRguw", "slug": "rawfisheater",       "name": "회사랑",             "tab": "videos", "handle": "RawFishEater"},
 ]
 
 
