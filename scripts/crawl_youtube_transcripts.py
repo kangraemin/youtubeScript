@@ -134,8 +134,35 @@ def _attach_duration(youtube, videos: list, min_sec: int, ch: dict) -> list:
     return kept
 
 
+# 맛집 백필(--days 2190)이 매시 6년치 목록을 새로 받아 하루 ~6천 unit을 써서
+# 일일 quota(1만)가 바닥나고 전 채널 크롤이 403으로 멈췄다(2026-10-23).
+# 긴 기간 목록은 하루 안에 거의 안 바뀌고, 새 영상은 짧은 기간 정기 크롤이 받으므로 캐시한다.
+LIST_CACHE_DIR = Path("rawdata/transcripts/_listcache")
+LIST_CACHE_MIN_DAYS = 60
+LIST_CACHE_TTL_SEC = 24 * 3600
+
+
 def get_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) -> list[dict]:
-    """YouTube Data API v3으로 채널 영상/스트림 목록 수집."""
+    """YouTube Data API v3으로 채널 영상/스트림 목록 수집. 긴 기간은 24시간 캐시."""
+    if days_limit <= LIST_CACHE_MIN_DAYS:
+        return _fetch_channel_videos_api(youtube, ch, max_videos, days_limit)
+    path = LIST_CACHE_DIR / f"{ch['slug']}_d{days_limit}_m{max_videos}.json"
+    if path.exists() and time.time() - path.stat().st_mtime < LIST_CACHE_TTL_SEC:
+        try:
+            cached = json.loads(path.read_text())
+            print(f"[{ch['name']}] 목록 캐시 사용: {len(cached)}개", flush=True)
+            return cached
+        except (OSError, ValueError):
+            pass
+    fetched = _fetch_channel_videos_api(youtube, ch, max_videos, days_limit)
+    LIST_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(fetched, ensure_ascii=False))
+    tmp.replace(path)
+    return fetched
+
+
+def _fetch_channel_videos_api(youtube, ch: dict, max_videos: int, days_limit: int) -> list[dict]:
     cutoff = None
     if days_limit > 0:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days_limit)
