@@ -31,6 +31,8 @@ export USER="${USER:-$(id -un)}"
 
 echo "[$(date '+%F %T')] 시작" >> "$LOG"
 .venv/bin/python worker/pipeline.py --max-videos "${MUKMAP_MAX_VIDEOS:-10}" --max-minutes "${MUKMAP_MAX_MINUTES:-50}" --workers "${MUKMAP_WORKERS:-1}" >> "$LOG" 2>&1
+# 새 가게 영상을 외국어로 번역한다(회차당 30개)
+bash scripts/mukmap_translate.sh >> "$LOG" 2>&1
 
 YESTERDAY=$(date -v-1d '+%F')
 if [ ! -f "rawdata/reports/daily-$YESTERDAY.md" ]; then
