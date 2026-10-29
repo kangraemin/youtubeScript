@@ -1,6 +1,6 @@
 import json, sys
 from playwright.sync_api import sync_playwright
-BASE="https://web-green-kappa-79.vercel.app"
+BASE="https://youtube-summary.remin1994.workers.dev"
 OUT=sys.argv[1]
 res={}
 with sync_playwright() as p:
