@@ -78,7 +78,9 @@ export function InfiniteList({
       } else {
         const params=new URLSearchParams({limit:String(pageSize),offset:String(from),minDuration:String(hideShorts?SHORTS_THRESHOLD_SEC:0)})
         if(mode==='channel-summarized'&&channelSlug)params.set('channel',channelSlug)
-        const response=await fetch(`/api/feed?${params}`)
+        // DB가 먹맵 트래픽과 같이 쓰여 가끔 느려 503이 난다(10/31) → 두 번 더 시도한다.
+        let response=await fetch(`/api/feed?${params}`)
+        for(let i=1;i<=2&&response.status>=500;i++){await new Promise(r=>setTimeout(r,1500*i));response=await fetch(`/api/feed?${params}`)}
         const payload=await response.json()
         if(!response.ok)err={message:payload.error??'요약을 불러오지 못했어요.'}
         else data=payload as Transcript[]
