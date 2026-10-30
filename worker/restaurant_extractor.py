@@ -30,7 +30,11 @@ _API_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL")
 
 
 def _cli_env() -> dict:
-    return {k: v for k, v in os.environ.items() if k not in _API_ENV}
+    env = {k: v for k, v in os.environ.items() if k not in _API_ENV}
+    # 먹맵 전용 키(MUKMAP_ANTHROPIC_API_KEY)가 들어오면 구독 대신 그 키로 돈다(사용자 지시 10/31 "api key로 다해 한도없어")
+    if os.environ.get("MUKMAP_ANTHROPIC_API_KEY"):
+        env["ANTHROPIC_API_KEY"] = os.environ["MUKMAP_ANTHROPIC_API_KEY"]
+    return env
 
 
 class ExtractError(Exception):

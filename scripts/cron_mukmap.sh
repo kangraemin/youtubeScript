@@ -26,6 +26,11 @@ export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/bin:/bin:$PATH"
 export CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-/Users/ram/.config/claude-accounts/personal}"
 # 기본 계정(~/.claude)은 CLAUDE_CONFIG_DIR를 비워야 로그인된다(경로를 직접 넣으면 "Not logged in", 2026-10-20). MUKMAP_CLAUDE=default로 고른다
 [ "${MUKMAP_CLAUDE:-}" = default ] && unset CLAUDE_CONFIG_DIR
+# 먹맵 키가 있으면 추출도 API 키로 돈다(구독 한도와 무관, 사용자 지시 10/31). MUKMAP_NO_API=1이면 구독으로
+if [ -z "${MUKMAP_NO_API:-}" ]; then
+  KEYLINE=$(grep '^MUKMAP_ANTHROPIC_API_KEY=' "$HOME/.claude/.env" 2>/dev/null)
+  [ -n "$KEYLINE" ] && export MUKMAP_ANTHROPIC_API_KEY="${KEYLINE#*=}"
+fi
 # 로그인 토큰은 키체인에 있고 USER로 찾는다. cron엔 USER가 없어 "Not logged in"으로 전부 실패했다(2026-10-20)
 export USER="${USER:-$(id -un)}"
 
