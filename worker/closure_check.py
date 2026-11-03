@@ -112,7 +112,7 @@ def _status_by_search(name: str, address: str, search) -> str:
 
 
 def recheck_all(limit: int = 0) -> dict:
-    """저장된 보이는 가게를 다시 확인해 폐업이면 is_visible=false로 내린다.
+    """저장된 보이는 가게를 다시 확인해 폐업이면 is_visible=false, closed_at=지금으로 둔다.
 
     place_id가 있으면 플레이스 페이지로, 없으면 공식 지역검색에서 같은 도로명 주소가 나오는지로 본다.
     """
@@ -133,7 +133,9 @@ def recheck_all(limit: int = 0) -> dict:
         stats["checked"] += 1
         upd = {"closed_checked_at": now}
         if status == "closed":
+            # 지도·목록에서는 빼고, 먹맵 상세 주소는 404 대신 폐업 안내를 보여 준다(closed_at)
             upd["is_visible"] = False
+            upd["closed_at"] = now
             stats["closed"] += 1
             logger.info("폐업 처리: %s (%s)", row["name"], row["address"])
         elif status == "unknown":
