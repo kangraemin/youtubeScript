@@ -138,6 +138,18 @@ def _region_score(addr: str, regions: list[str], hint: str) -> int:
     return score
 
 
+# 네이버 지역 검색은 같은 이름의 옷가게·학원도 준다(바찌 송파점이 셔츠 가게, 2026-11-03) — 음식과 무관한 업종은 후보에서 뺀다
+NON_FOOD_CATEGORIES = (
+    "쇼핑", "패션", "의류", "잡화", "미용", "네일", "병원", "의원", "약국", "부동산", "학원", "교육",
+    "숙박", "호텔", "모텔", "자동차", "가구", "인테리어", "금융", "은행", "헬스", "종교", "교회",
+)
+
+
+def _is_non_food(item: dict) -> bool:
+    cat = item.get("category") or ""
+    return any(k in cat for k in NON_FOOD_CATEGORIES)
+
+
 def _pick_best(items: list[dict], regions: list[str], hint: str = "") -> tuple[dict | None, int]:
     """후보 중 hint 지역이 주소에 많이 들어간 것을 고른다. (후보, 지역 점수)를 돌려준다.
 
@@ -145,6 +157,7 @@ def _pick_best(items: list[dict], regions: list[str], hint: str = "") -> tuple[d
     지역 단서가 있는데 모든 후보가 불일치면 (None, 0) (false positive 방지).
     REGION_KEYWORDS에 없는 시·군(고흥·단양 등)은 주소의 행정구역 이름이 hint에 있는지로 맞춘다.
     """
+    items = [it for it in items if not _is_non_food(it)]
     if not items:
         return None, 0
     scored = []
@@ -198,6 +211,27 @@ def _hint_street(hint: str) -> str | None:
     return m.group(1) if m else None
 
 
+_METRO = {"서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "제주"}
+
+
+def _hint_districts(hint: str) -> list[str]:
+    """힌트의 시·군·구 이름("강남구", "고흥군"). 광역시 이름("서울시"·"대구")은 뺀다."""
+    out = []
+    for w in re.findall(r"[가-힣]{2,}", hint or ""):
+        m = re.fullmatch(r"([가-힣]{1,4})(구|시|군)", w)
+        if m and w not in _METRO and m.group(1) not in _METRO and "특별" not in w and "광역" not in w:
+            out.append(w)
+    return out
+
+
+def _branch(s: str) -> str | None:
+    """띄어 쓴 마지막 단어의 지점명("하비오점" → "하비오"). 없으면 None."""
+    words = _strip_html(s or "").split()
+    if len(words) > 1 and words[-1].endswith("점") and len(words[-1]) > 1:
+        return words[-1][:-1]
+    return None
+
+
 def _confident(name: str, found: str, address: str, regions: list[str], hint: str, region_score: int) -> bool:
     """확신 high 판정.
 
@@ -209,6 +243,14 @@ def _confident(name: str, found: str, address: str, regions: list[str], hint: st
     if _hint_has_street(hint, address):
         return True
     if region_score < 1:
+        return False
+    # "서울"만 맞고 구가 다르면 같은 이름의 다른 지점이다(나이쏘이 강남점 영상에 하비오점이 붙던 것)
+    districts = _hint_districts(hint)
+    if districts and not any(d in address for d in districts):
+        return False
+    # 지점명이 둘 다 있는데 다르면 다른 지점이다
+    a, b = _branch(name), _branch(found)
+    if a and b and a != b:
         return False
     if name_similar(name, found):
         return True
