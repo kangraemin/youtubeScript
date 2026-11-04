@@ -121,22 +121,27 @@ def update_queue_status(
 _HUMAN_FIELDS = ("needs_review", "is_visible")
 
 
+def find_restaurant(client: Client, restaurant: dict) -> dict | None:
+    """이미 있는 가게 행을 찾는다. naver_place_id가 있으면 그것으로 먼저, 없으면 (name, address)."""
+    if restaurant.get("naver_place_id"):
+        hit = (client.table("restaurants").select("id,is_visible")
+               .eq("naver_place_id", restaurant["naver_place_id"]).limit(1).execute()).data
+        if hit:
+            return hit[0]
+    q = client.table("restaurants").select("id,is_visible").eq("name", restaurant["name"])
+    q = q.eq("address", restaurant["address"]) if restaurant.get("address") else q.is_("address", "null")
+    hit = q.limit(1).execute().data
+    return hit[0] if hit else None
+
+
 def upsert_restaurant(client: Client, restaurant: dict) -> int:
     """가게를 넣거나 갱신하고 id를 돌려준다.
 
-    중복 판정: naver_place_id가 있으면 그것으로 먼저 찾고, 없으면 (name, address).
     기존 행이면 needs_review / is_visible은 그대로 둔다.
     """
-    hit = None
-    if restaurant.get("naver_place_id"):
-        hit = (client.table("restaurants").select("id")
-               .eq("naver_place_id", restaurant["naver_place_id"]).limit(1).execute()).data
-    if not hit:
-        q = client.table("restaurants").select("id").eq("name", restaurant["name"])
-        q = q.eq("address", restaurant["address"]) if restaurant.get("address") else q.is_("address", "null")
-        hit = q.limit(1).execute().data
+    hit = find_restaurant(client, restaurant)
     if hit:
-        rid = hit[0]["id"]
+        rid = hit["id"]
         upd = {k: v for k, v in restaurant.items() if k not in _HUMAN_FIELDS and v is not None}
         if upd:
             client.table("restaurants").update(upd).eq("id", rid).execute()

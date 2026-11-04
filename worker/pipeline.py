@@ -202,7 +202,8 @@ def _video_row(video: dict, rest_id: int, rest: dict) -> dict:
     }
 
 
-def _save(db, video: dict, place: dict, rest: dict, confident: bool, out: list):
+def _save(db, video: dict, place: dict, rest: dict, confident: bool, out: list) -> bool:
+    """가게와 영상 연결을 저장한다. 확신이 낮은데 찾은 가게가 이미 지도에 보이면 붙이지 않고 False."""
     region, city = region_city(place.get("address"))
     row = {
         "name": place["name"],
@@ -217,12 +218,19 @@ def _save(db, video: dict, place: dict, rest: dict, confident: bool, out: list):
         "needs_review": not confident,
         "is_visible": confident,
     }
+    # 확신이 낮은 영상을 보이는 가게에 붙이면 검수 없이 바로 노출된다
+    if not confident and db is not None:
+        from supabase_client import find_restaurant
+        hit = find_restaurant(db, row)
+        if hit and hit.get("is_visible"):
+            return False
     out.append({**row, "menu": rest.get("menu"), "price": rest.get("price"), "quote": rest.get("quote"), "detail": rest.get("detail")})
     if db is None:
-        return
+        return True
     from supabase_client import upsert_restaurant, upsert_video
     rid = upsert_restaurant(db, row)
     upsert_video(db, _video_row(video, rid, rest))
+    return True
 
 
 def drop_old_rows(db, vid: str) -> list[int]:
@@ -251,6 +259,7 @@ def process_video(db, video: dict, stats: dict) -> list[dict]:
     vid = video["video_id"]
     logger.info("처리: %s (%s)", video.get("title"), vid)
     saved: list[dict] = []
+    held = 0
     transcript = fetch_transcript(vid)
     if not transcript:
         queue_set(db, video, "no_transcript")
@@ -309,13 +318,17 @@ def process_video(db, video: dict, stats: dict) -> list[dict]:
             log_skipped(video, rest, reason="closed")
             stats["closed"] += 1
             continue
-        _save(db, video, place, rest, confident, saved)
+        if not _save(db, video, place, rest, confident, saved):
+            log_skipped(video, rest, reason="low_confidence_visible_store", place=place)
+            stats["held"] += 1
+            held += 1
+            continue
         stats["restaurants"] += 1
         stats["needs_review"] += 0 if confident else 1
 
     if old_rest_ids:
         hide_orphans(db, old_rest_ids)
-    queue_set(db, video, "done" if saved else "no_restaurant", result=restaurants)
+    queue_set(db, video, "done" if saved or held else "no_restaurant", result=restaurants)
     return saved
 
 
@@ -365,7 +378,7 @@ def main():
         return
     enrich_metadata(youtube, todo)
 
-    stats = dict(videos=0, restaurants=0, needs_review=0, skipped=0, closed=0, failed=0,
+    stats = dict(videos=0, restaurants=0, needs_review=0, held=0, skipped=0, closed=0, failed=0,
                  naver_calls=0, input_tokens=0, output_tokens=0)
     deadline = time.time() + args.max_minutes * 60 if args.max_minutes else None
     results = {}

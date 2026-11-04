@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 _SKIP_DIR = Path(__file__).resolve().parent.parent / "rawdata" / "skipped"
 
 
-def log_skipped(video: dict, extracted: dict, reason: str) -> None:
+def log_skipped(video: dict, extracted: dict, reason: str, place: dict | None = None) -> None:
     """AI가 추출했으나 네이버 지역 매칭 실패한 엔트리를 오늘자 JSONL에 append."""
     _SKIP_DIR.mkdir(parents=True, exist_ok=True)
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -31,6 +31,8 @@ def log_skipped(video: dict, extracted: dict, reason: str) -> None:
         },
         "reason": reason,
     }
+    if place:
+        entry["matched"] = {k: place.get(k) for k in ("name", "address", "naver_place_id")}
     try:
         with path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
