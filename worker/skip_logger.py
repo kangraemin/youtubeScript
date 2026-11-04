@@ -33,6 +33,9 @@ def log_skipped(video: dict, extracted: dict, reason: str, place: dict | None = 
     }
     if place:
         entry["matched"] = {k: place.get(k) for k in ("name", "address", "naver_place_id")}
+        # 화면 확인으로 나중에 붙일 때 필요한 값
+        entry["rest"] = extracted
+        entry["video"] = {k: video.get(k) for k in ("thumbnail_url", "published_at")}
     try:
         with path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
