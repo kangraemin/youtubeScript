@@ -69,8 +69,15 @@ def _strip_html(text: str) -> str:
 
 
 def _extract_region(address: str) -> str | None:
+    """주소 맨 앞 행정구역만 본다. 뒤쪽까지 찾으면 '경기전길'이 경기, '새서울쇼핑'이 서울이 된다.
+    전남광주(통합특별시)는 구면 광주, 시·군이면 전남이다."""
+    words = address.split()
+    if not words:
+        return None
+    if words[0].startswith("전남광주"):
+        return "광주" if len(words) > 1 and words[1].endswith("구") else "전남"
     for keyword, region in REGION_MAP.items():
-        if keyword in address:
+        if words[0].startswith(keyword):
             return region
     return None
 

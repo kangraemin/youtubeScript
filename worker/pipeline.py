@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from chain_blacklist import is_chain  # noqa: E402
 from closure_check import get_place_status  # noqa: E402
 from description_parser import parse_description_places  # noqa: E402
-from naver_search import REGION_MAP, name_similar, search_restaurant  # noqa: E402
+from naver_search import _extract_region, name_similar, search_restaurant  # noqa: E402
 from restaurant_extractor import PROMPT_VERSION, ExtractBlocked, ExtractError, extract_restaurants  # noqa: E402
 from skip_logger import log_skipped  # noqa: E402
 from transcript_fetcher import fetch_transcript  # noqa: E402
@@ -79,7 +79,7 @@ def region_city(address: str | None) -> tuple[str | None, str | None]:
     """"광주 동구 ..." → ("광주", "동구"), "경기 수원시 팔달구 ..." → ("경기", "수원시")."""
     if not address:
         return None, None
-    region = next((v for k, v in REGION_MAP.items() if k in address), None)
+    region = _extract_region(address)
     words = address.split()
     city = words[1] if len(words) > 1 and re.search(r"[시군구]$", words[1]) else None
     return region, city
