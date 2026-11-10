@@ -5,6 +5,11 @@ from pathlib import Path
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
+try:  # worker/ 를 sys.path에 넣고 부를 때와 worker.supabase_client 로 부를 때 둘 다
+    from address_key import same_place
+except ImportError:
+    from worker.address_key import same_place
+
 _ENV_LOCAL = Path(__file__).resolve().parent.parent / ".env.local"
 
 # EADDRNOTAVAIL(49), ECONNRESET(54), ETIMEDOUT(60), ECONNREFUSED(61), EHOSTDOWN(64), EHOSTUNREACH(65)
@@ -131,7 +136,16 @@ def find_restaurant(client: Client, restaurant: dict) -> dict | None:
     q = client.table("restaurants").select("id,is_visible").eq("name", restaurant["name"])
     q = q.eq("address", restaurant["address"]) if restaurant.get("address") else q.is_("address", "null")
     hit = q.limit(1).execute().data
-    return hit[0] if hit else None
+    if hit:
+        return hit[0]
+    # 시·도 표기만 다른 같은 가게('서울특별시 …' vs '서울 …')를 새로 넣지 않는다(먹맵 중복 185묶음, 11/10)
+    if restaurant.get("address"):
+        same = (client.table("restaurants").select("id,is_visible,name,address,lat,lng")
+                .eq("name", restaurant["name"]).order("id").execute()).data or []
+        for row in same:
+            if same_place(restaurant, row):
+                return {"id": row["id"], "is_visible": row["is_visible"]}
+    return None
 
 
 def upsert_restaurant(client: Client, restaurant: dict) -> int:
