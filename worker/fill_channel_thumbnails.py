@@ -11,7 +11,7 @@ from googleapiclient.discovery import build
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from supabase_client import get_client
+from d1_client import get_d1
 from scripts.channel_config import food_channels
 
 logging.basicConfig(
@@ -28,7 +28,7 @@ def main():
     load_dotenv(project_root / ".env.local", override=False)
 
     youtube = build("youtube", "v3", developerKey=os.environ["YOUTUBE_API_KEY"])
-    db = get_client()
+    db = get_d1()
 
     response = youtube.channels().list(
         part="snippet",

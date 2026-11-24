@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "worker"))
 
-from supabase_client import get_client  # noqa: E402
+from d1_client import get_d1 as get_client, to_iso  # noqa: E402
 
 KST = timezone(timedelta(hours=9))
 USAGE_LOG = ROOT / "rawdata/reports/pipeline-usage.jsonl"
@@ -28,7 +28,7 @@ def _count(q) -> int:
 def build(day: date) -> str:
     start = datetime(day.year, day.month, day.day, tzinfo=KST)
     end = start + timedelta(days=1)
-    s, e = start.isoformat(), end.isoformat()
+    s, e = to_iso(start), to_iso(end)  # D1 시각은 UTC 'Z' 글자 — 글자 비교라 같은 모양으로 맞춘다
     db = get_client()
 
     def q(table):

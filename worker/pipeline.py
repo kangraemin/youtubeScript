@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
+import requests
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 
@@ -31,6 +32,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from chain_blacklist import is_chain  # noqa: E402
+from d1_client import now_iso  # noqa: E402
 from closure_check import get_place_status  # noqa: E402
 from description_parser import parse_description_places  # noqa: E402
 from naver_search import _extract_region, name_similar, search_restaurant  # noqa: E402
@@ -174,7 +176,7 @@ def queue_set(db, video: dict, status: str, error: str | None = None, result: li
         row["retry_count"] = ((prev[0].get("retry_count") or 0) if same else 0) + 1
     elif status in FINISHED:
         row["retry_count"] = 0
-        row["processed_at"] = datetime.now(timezone.utc).isoformat()
+        row["processed_at"] = now_iso()
     if result is not None:
         row["extraction_result"] = result  # jsonb 칸 — 문자열로 넣으면 JSON 문자열 하나로 저장된다
     db.table("processing_queue").upsert(row, on_conflict="video_id").execute()
@@ -363,7 +365,7 @@ def main():
     args = ap.parse_args()
 
     load_env()
-    from supabase_client import get_client
+    from d1_client import get_d1 as get_client
     db_read = get_client()
     db = None if args.dry_run else db_read
     youtube = build("youtube", "v3", developerKey=os.environ["YOUTUBE_API_KEY"])
@@ -407,8 +409,8 @@ def main():
                 try:
                     res = process_video(client(), v, mine)
                     break
-                except httpx.TransportError as e:
-                    # Supabase HTTP/2 연결이 가끔 SSL 오류(bad record mac)로 끊긴다 — 연결을 새로 열고 같은 영상을 다시 한다
+                except (httpx.TransportError, requests.RequestException) as e:
+                    # D1 REST 연결이 끊기면(재시도 소진 후) 같은 영상을 다시 한다
                     logger.warning("DB 연결 오류(%d/3): %s — %s", attempt + 1, v["video_id"], e)
                     time.sleep(5 * (attempt + 1))
                     local.db = None if args.dry_run else get_client()

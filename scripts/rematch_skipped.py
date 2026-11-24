@@ -216,7 +216,7 @@ def match_one(db, video: dict, rest: dict, orig: str, cand: dict, sources: str, 
 def cmd_collect(args):
     import anthropic
     from pipeline import _cached_extract
-    from supabase_client import get_client
+    from d1_client import get_d1 as get_client
 
     c = anthropic.Anthropic()
     state = read_state()

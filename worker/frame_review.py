@@ -216,8 +216,8 @@ def main():
     todo = [e for e in held_entries() if _key(e) not in done][:min(args.max, CLAUDE_P_MAX)]
     if not todo:
         return
-    from supabase_client import get_client
-    db = get_client()
+    from d1_client import get_d1
+    db = get_d1()
     DONE_FILE.parent.mkdir(parents=True, exist_ok=True)
     for e in todo:
         try:

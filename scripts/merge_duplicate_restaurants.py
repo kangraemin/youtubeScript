@@ -20,7 +20,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "worker"))
 from address_key import same_place  # noqa: E402
-from supabase_client import get_client  # noqa: E402
+from d1_client import get_d1 as get_client  # noqa: E402
 
 MAP_FILE = ROOT.parent / "mukmap" / "lib" / "merged-restaurants.json"
 

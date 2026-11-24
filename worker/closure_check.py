@@ -116,14 +116,14 @@ def recheck_all(limit: int = 0) -> dict:
 
     place_id가 있으면 플레이스 페이지로, 없으면 공식 지역검색에서 같은 도로명 주소가 나오는지로 본다.
     """
-    from supabase_client import get_client
+    from d1_client import get_d1, now_iso
     from naver_search import _search_candidates
 
-    db = get_client()
+    db = get_d1()
     q = (db.table("restaurants").select("id,name,address,naver_place_id")
          .eq("is_visible", True).order("closed_checked_at", desc=False, nullsfirst=True))
     rows = (q.limit(limit) if limit else q).execute().data or []
-    now = datetime.now(timezone.utc).isoformat()
+    now = now_iso()
     stats = {"checked": 0, "closed": 0, "unknown": 0}
     for row in rows:
         if row.get("naver_place_id"):

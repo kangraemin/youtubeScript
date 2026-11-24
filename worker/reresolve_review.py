@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from chain_blacklist import is_chain  # noqa: E402
 from naver_search import _hint_regions, _region_score, name_close, name_similar, search_restaurant  # noqa: E402
 from pipeline import load_env, region_city, trigger_revalidate  # noqa: E402
-from supabase_client import get_client  # noqa: E402
+from d1_client import get_d1 as get_client  # noqa: E402
 
 REPORT = Path(__file__).resolve().parent.parent / "rawdata" / "reports" / "reresolve-review.json"
 

@@ -117,7 +117,7 @@ def update_queue_status(
     if status == "done":
         from datetime import datetime, timezone
 
-        data["processed_at"] = datetime.now(timezone.utc).isoformat()
+        data["processed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
     client.table("processing_queue").update(data).eq("video_id", video_id).execute()
 
