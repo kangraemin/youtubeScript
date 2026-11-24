@@ -34,6 +34,9 @@ UNIQUE_KEYS = {
     "alert_near": ("anon_key", "restaurant_id"),
     "alert_near_state": ("anon_key",),
     "push_subs": ("token", "channel_id"),
+    # 11/25 먹맵 D1에 고유 인덱스를 걸어 한 문장(ON CONFLICT)으로 넣는다(supabase/d1/20261125_mukmap_db.sql)
+    "processing_queue": ("video_id",),
+    "videos": ("video_id", "restaurant_id"),
 }
 TABLES = {"channels", "restaurants", "videos", "processing_queue",
           "alert_subs", "alert_state", "alert_near", "alert_near_state", "push_subs"}
@@ -46,7 +49,7 @@ RELATIONS = {
 _IDENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 MAX_PARAMS = 90          # D1 는 문장당 바인딩 100개까지 — 넘으면 숫자·글자를 문장에 직접 적는다
 BATCH_CHUNK = 40         # 한 요청에 담는 문장 수
-MIN_INTERVAL = 0.25      # 전체 스레드 합쳐 초당 4번 이하(≈1200/5분)
+MIN_INTERVAL = 0.35      # 전체 스레드 합쳐 초당 3번 이하. API 한도(1200/5분)를 꽉 채우면 wrangler·번역 스크립트와 겹쳐 429가 난다(11/25 검토)
 
 _rate_lock = threading.Lock()
 _last_call = 0.0
@@ -413,8 +416,7 @@ class Query:
                 stmts.append((f"INSERT INTO {self.table} ({','.join(cols)}) VALUES ({','.join('?' * len(cols))}) "
                               f"ON CONFLICT({','.join(conflict)}) {action}", vals))
                 continue
-            # 고유 인덱스가 없는 조합(processing_queue.video_id, videos.video_id+restaurant_id): 같은 요청 안에서
-            # UPDATE 후 없을 때만 INSERT
+            # UNIQUE_KEYS에 없는 조합: 같은 요청(한 트랜잭션) 안에서 UPDATE 후 없을 때만 INSERT
             key_sql = " AND ".join(f"{_ident(c)} IS ?" for c in conflict)
             key_vals = [_param(row.get(c)) for c in conflict]
             if rest:

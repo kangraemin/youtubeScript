@@ -160,7 +160,17 @@ def upsert_restaurant(client: Client, restaurant: dict) -> int:
         if upd:
             client.table("restaurants").update(upd).eq("id", rid).execute()
         return rid
-    res = client.table("restaurants").insert(restaurant).execute()
+    try:
+        res = client.table("restaurants").insert(restaurant).execute()
+    except Exception as e:
+        # 같은 naver_place_id는 한 번만 들어간다(D1 고유 인덱스, 11/25). 다른 스레드가 먼저 넣었거나
+        # 시간 초과 뒤 재시도가 이미 들어간 줄과 부딪친 것이라 그 줄을 다시 찾아 쓴다
+        if "UNIQUE" not in str(e):
+            raise
+        hit = find_restaurant(client, restaurant)
+        if not hit:
+            raise
+        return hit["id"]
     return res.data[0]["id"]
 
 
