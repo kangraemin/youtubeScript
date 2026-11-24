@@ -18,15 +18,30 @@ set -a
 set +a
 MODE=()
 KEYLINE=$(grep '^MUKMAP_ANTHROPIC_API_KEY=' "$HOME/.claude/.env" 2>/dev/null)
-if [ -n "$KEYLINE" ]; then
-  export "$KEYLINE"
-  MODE=(--api --budget "$BUDGET")
+# 하루 합계 상한(달러). 회차 상한만 있으면 매시간 돌아 하루 최대 24배가 된다(11/24 검토)
+DAILY="${MUKMAP_TRANSLATE_DAILY:-3}"
+SPENT_FILE="$HOME/.cache/mukmap-translate-$(date +%F)"
+SPENT=$(cat "$SPENT_FILE" 2>/dev/null || echo 0)
+LEFT=$(python3 -c "print(max(0.0, min($BUDGET, $DAILY - $SPENT)))")
+rc=0; DONE=0
+if [ -n "$KEYLINE" ] && python3 -c "import sys; sys.exit(0 if $LEFT < 0.05 else 1)"; then
+  echo "번역 스킵: 오늘 쓴 돈 \$$SPENT (하루 상한 \$$DAILY)"
+else
+  if [ -n "$KEYLINE" ]; then
+    export "$KEYLINE"
+    MODE=(--api --budget "$LEFT")
+  fi
+  OUT=$(python3 "$MUKMAP_DIR/scripts/translate_i18n.py" "${MODE[@]}" 1 "$MAX" 2>&1)
+  rc=$?
+  echo "$OUT"
+  DONE=$(echo "$OUT" | awk '/^done /{n=$2} END{print n+0}')
+  COST=$(echo "$OUT" | sed -nE 's/.*cost \$([0-9.]+).*/\1/p' | tail -1)
+  [ -n "$COST" ] && python3 -c "print(round($SPENT + $COST, 4))" > "$SPENT_FILE"
 fi
-OUT=$(python3 "$MUKMAP_DIR/scripts/translate_i18n.py" "${MODE[@]}" 1 "$MAX" 2>&1)
-rc=$?
-echo "$OUT"
-DONE=$(echo "$OUT" | awk '/^done /{n=$2} END{print n+0}')
-if [ "$DONE" -gt 0 ]; then
-  bash "$MUKMAP_DIR/scripts/publish_pins.sh"
+# 핀·사이트 데이터 파일을 다시 쓰고, 지난 파일과 비교해 바뀐 가게 페이지만 새로 그린다(publish_pins.sh).
+# 번역이 있었거나, 수집이 가게를 바꿨거나(.mukmap.changed), 하루 한 번(04시: 폐업 숨김·합치기처럼 표시를 안 남기는 변경)
+FLAG="$(dirname "$0")/../rawdata/reports/.mukmap.changed"
+if [ "$DONE" -gt 0 ] || [ -s "$FLAG" ] || [ "$(date +%H)" = 04 ]; then
+  bash "$MUKMAP_DIR/scripts/publish_pins.sh" && rm -f "$FLAG"
 fi
 exit "$rc"

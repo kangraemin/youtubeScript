@@ -339,25 +339,18 @@ def process_video(db, video: dict, stats: dict) -> list[dict]:
 
 
 def trigger_revalidate(ids=None) -> None:
-    """mukmap.kr 캐시 무효화. 바뀐 가게 id만 보낸다(없으면 이번 회차 CHANGED_IDS). 실패해도 파이프라인은 성공 처리."""
+    """가게가 바뀌었다는 표시만 남긴다. 실제 새로 그리기는 번역 뒤 mukmap_translate.sh → publish_pins.sh가
+    핀·사이트 데이터 파일을 다시 쓴 다음, 지난 파일과 비교해 바뀐 가게 페이지만 한다(11/24).
+    여기서 바로 부르면 사이트 데이터 파일이 아직 옛것이라 새 가게가 빠진 페이지로 굳었다."""
     ids = sorted(set(ids if ids is not None else CHANGED_IDS))
     if not ids:
-        logger.info("revalidate 스킵: 바뀐 가게 없음")
+        logger.info("새로 그리기 표시 스킵: 바뀐 가게 없음")
         return
-    base = os.environ.get("MUKMAP_BASE_URL")
-    secret = os.environ.get("MUKMAP_REVALIDATE_SECRET")
-    if not base or not secret:
-        logger.info("revalidate 스킵: MUKMAP_BASE_URL / MUKMAP_REVALIDATE_SECRET 미설정")
-        return
-    try:
-        import urllib.request
-        req = urllib.request.Request(f"{base.rstrip('/')}/api/revalidate", method="POST",
-                                     data=json.dumps({"ids": ids}).encode(),
-                                     headers={"x-revalidate-secret": secret, "content-type": "application/json"})
-        with urllib.request.urlopen(req, timeout=10) as r:
-            logger.info("revalidate 호출 성공: %s", r.status)
-    except Exception as e:
-        logger.warning("revalidate 호출 실패 (무시): %s", e)
+    flag = Path(__file__).resolve().parent.parent / "rawdata" / "reports" / ".mukmap.changed"
+    flag.parent.mkdir(parents=True, exist_ok=True)
+    with flag.open("a") as f:
+        f.write(" ".join(map(str, ids)) + "\n")
+    logger.info("새로 그리기 표시: 가게 %d곳", len(ids))
 
 
 def main():
