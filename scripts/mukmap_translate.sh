@@ -41,7 +41,10 @@ fi
 # 핀·사이트 데이터 파일을 다시 쓰고, 지난 파일과 비교해 바뀐 가게 페이지만 새로 그린다(publish_pins.sh).
 # 번역이 있었거나, 수집이 가게를 바꿨거나(.mukmap.changed), 하루 한 번(04시: 폐업 숨김·합치기처럼 표시를 안 남기는 변경)
 FLAG="$(dirname "$0")/../rawdata/reports/.mukmap.changed"
+# 표시 파일은 게시 전에 옮겨 둔다. 게시 중에 수집이 새로 적은 표시를 같이 지우지 않게. 실패하면 되돌려 다음 회차가 다시 한다
 if [ "$DONE" -gt 0 ] || [ -s "$FLAG" ] || [ "$(date +%H)" = 04 ]; then
-  bash "$MUKMAP_DIR/scripts/publish_pins.sh" && rm -f "$FLAG"
+  [ -f "$FLAG" ] && mv "$FLAG" "$FLAG.run"
+  if bash "$MUKMAP_DIR/scripts/publish_pins.sh"; then rm -f "$FLAG.run"
+  elif [ -f "$FLAG.run" ]; then cat "$FLAG.run" >> "$FLAG"; rm -f "$FLAG.run"; fi
 fi
 exit "$rc"

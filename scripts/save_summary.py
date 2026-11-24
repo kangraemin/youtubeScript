@@ -182,19 +182,16 @@ def main() -> int:
     }).eq("vid", vid).execute()
 
     # 새 요약 반영 — 홈/latest 캐시 무효화 (실패해도 저장은 유지)
+    # 페이지를 바로 비우지 않고 표시만 남긴다. 다음 수집 회차(mukmap_translate.sh → publish_pins.sh)가
+    # 사이트 데이터 파일을 다시 쓴 뒤 바뀐 가게 페이지만 새로 그린다. 예전 호출은 전체를 비우는 길이었다(11/24 요금 급증)
     try:
-        import urllib.parse
-        import urllib.request
-
-        base = os.environ.get("REVALIDATE_URL")
-        sec = os.environ.get("REVALIDATE_SECRET")
-        if base and sec:
-            u = f"{base.rstrip('/')}/api/revalidate?secret={urllib.parse.quote(sec)}"
-            urllib.request.urlopen(
-                urllib.request.Request(u, method="POST"), timeout=8
-            ).read()
+        from pathlib import Path
+        flag = Path(__file__).resolve().parent.parent / "rawdata" / "reports" / ".mukmap.changed"
+        flag.parent.mkdir(parents=True, exist_ok=True)
+        with flag.open("a") as f:
+            f.write(f"video {vid}\n")
     except Exception as e:
-        print(f"revalidate skip: {e}", file=sys.stderr)
+        print(f"changed flag skip: {e}", file=sys.stderr)
 
     print(f"saved: {vid}")
     return 0
