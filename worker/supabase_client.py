@@ -156,12 +156,20 @@ def upsert_restaurant(client: Client, restaurant: dict) -> int:
         rid = hit["id"]
         upd = {k: v for k, v in restaurant.items() if k not in _HUMAN_FIELDS and v is not None}
         if upd:
-            client.table("restaurants").update(upd).eq("id", rid).execute()
+            try:
+                client.table("restaurants").update(upd).eq("id", rid).execute()
+            except Exception as e:
+                # 고친 이름·주소가 다른 가게 줄과 같아지면 (name, address) 고유 인덱스(11/25)에 걸린다. 그 두 칸만 빼고 갱신한다
+                if "UNIQUE" not in str(e):
+                    raise
+                upd = {k: v for k, v in upd.items() if k not in ("name", "address", "naver_place_id")}
+                if upd:
+                    client.table("restaurants").update(upd).eq("id", rid).execute()
         return rid
     try:
         res = client.table("restaurants").insert(restaurant).execute()
     except Exception as e:
-        # 같은 naver_place_id는 한 번만 들어간다(D1 고유 인덱스, 11/25). 다른 스레드가 먼저 넣었거나
+        # 같은 naver_place_id, 같은 (이름, 주소)는 한 번만 들어간다(D1 고유 인덱스, 11/25). 다른 스레드가 먼저 넣었거나
         # 시간 초과 뒤 재시도가 이미 들어간 줄과 부딪친 것이라 그 줄을 다시 찾아 쓴다
         if "UNIQUE" not in str(e):
             raise
