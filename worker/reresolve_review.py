@@ -153,7 +153,9 @@ def main():
     REPORT.write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps({k: len(v) for k, v in out.items()}, ensure_ascii=False), "apply" if args.apply else "dry-run")
     if args.apply:
-        trigger_revalidate()
+        # 손본 가게(와 합친 대상)만 새로 그리게 id를 넘긴다
+        ids = {x.get(k) for v in out.values() for x in v if isinstance(x, dict) for k in ("id", "into")}
+        trigger_revalidate([i for i in ids if isinstance(i, int)])
 
 
 if __name__ == "__main__":

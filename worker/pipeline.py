@@ -202,6 +202,10 @@ def _video_row(video: dict, rest_id: int, rest: dict) -> dict:
     }
 
 
+# 이번 회차에 바뀐 가게 id. 먹맵은 이 가게와 관련된 페이지만 새로 그린다(11/24 전체 다시 그리기로 요금 급증)
+CHANGED_IDS: set[int] = set()
+
+
 def _save(db, video: dict, place: dict, rest: dict, confident: bool, out: list) -> bool:
     """가게와 영상 연결을 저장한다. 확신이 낮은데 찾은 가게가 이미 지도에 보이면 붙이지 않고 False."""
     region, city = region_city(place.get("address"))
@@ -230,6 +234,7 @@ def _save(db, video: dict, place: dict, rest: dict, confident: bool, out: list) 
     from supabase_client import upsert_restaurant, upsert_video
     rid = upsert_restaurant(db, row)
     upsert_video(db, _video_row(video, rid, rest))
+    CHANGED_IDS.add(rid)
     return True
 
 
@@ -243,6 +248,7 @@ def drop_old_rows(db, vid: str) -> list[int]:
     old = db.table("videos").select("restaurant_id").eq("video_id", vid).execute().data or []
     if old:
         db.table("videos").delete().eq("video_id", vid).execute()
+    CHANGED_IDS.update(r["restaurant_id"] for r in old if r.get("restaurant_id"))
     return [r["restaurant_id"] for r in old if r.get("restaurant_id")]
 
 
@@ -332,8 +338,12 @@ def process_video(db, video: dict, stats: dict) -> list[dict]:
     return saved
 
 
-def trigger_revalidate() -> None:
-    """mukmap.kr 캐시 무효화. 실패해도 파이프라인은 성공 처리."""
+def trigger_revalidate(ids=None) -> None:
+    """mukmap.kr 캐시 무효화. 바뀐 가게 id만 보낸다(없으면 이번 회차 CHANGED_IDS). 실패해도 파이프라인은 성공 처리."""
+    ids = sorted(set(ids if ids is not None else CHANGED_IDS))
+    if not ids:
+        logger.info("revalidate 스킵: 바뀐 가게 없음")
+        return
     base = os.environ.get("MUKMAP_BASE_URL")
     secret = os.environ.get("MUKMAP_REVALIDATE_SECRET")
     if not base or not secret:
@@ -342,7 +352,8 @@ def trigger_revalidate() -> None:
     try:
         import urllib.request
         req = urllib.request.Request(f"{base.rstrip('/')}/api/revalidate", method="POST",
-                                     headers={"x-revalidate-secret": secret})
+                                     data=json.dumps({"ids": ids}).encode(),
+                                     headers={"x-revalidate-secret": secret, "content-type": "application/json"})
         with urllib.request.urlopen(req, timeout=10) as r:
             logger.info("revalidate 호출 성공: %s", r.status)
     except Exception as e:
