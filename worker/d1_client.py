@@ -24,7 +24,8 @@ from dotenv import load_dotenv
 _ENV_LOCAL = Path(__file__).resolve().parent.parent / ".env.local"
 DATABASE_ID = "189c0c85-3ca8-41fc-8359-736c276e4408"  # mukmap-db
 
-JSON_COLS = {"menu", "price", "quote", "why", "detail", "i18n", "extraction_result"}
+# menu·price·quote·why는 글자 칸이다. 여기 두면 "[1]" 같은 값이 목록으로 풀려 모양이 바뀐다(11/25 검토)
+JSON_COLS = {"detail", "i18n", "extraction_result"}
 BOOL_COLS = {"needs_review", "is_visible", "is_ad"}
 # 기본키/고유키로 선언된 조합 — 이 조합이면 ON CONFLICT 로, 아니면 UPDATE 후 INSERT-없을 때만 으로 흉내 낸다
 UNIQUE_KEYS = {

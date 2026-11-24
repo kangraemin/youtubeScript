@@ -104,22 +104,20 @@ def update_queue_status(
     data: dict = {"status": status}
     if error_message:
         data["error_message"] = error_message
-    if status == "failed":
-        # increment retry_count via raw update
-        row = (
-            client.table("processing_queue")
-            .select("retry_count")
-            .eq("video_id", video_id)
-            .single()
-            .execute()
-        )
-        data["retry_count"] = (row.data.get("retry_count", 0) or 0) + 1
     if status == "done":
         from datetime import datetime, timezone
 
         data["processed_at"] = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
     client.table("processing_queue").update(data).eq("video_id", video_id).execute()
+    if status == "failed":
+        # 읽고 +1 해서 쓰면 두 스레드가 같은 영상을 실패 처리할 때 한 번이 빠진다. 한 문장으로 더한다(11/25 검토)
+        from worker.d1_client import D1Client, query
+        if isinstance(client, D1Client):
+            query("UPDATE processing_queue SET retry_count = coalesce(retry_count, 0) + 1 WHERE video_id = ?", [video_id])
+        else:
+            row = client.table("processing_queue").select("retry_count").eq("video_id", video_id).single().execute()
+            client.table("processing_queue").update({"retry_count": (row.data.get("retry_count") or 0) + 1}).eq("video_id", video_id).execute()
 
 
 # 사람이 관리자 화면에서 바꿨을 수 있는 칸 — 기존 행을 갱신할 때는 덮어쓰지 않는다
