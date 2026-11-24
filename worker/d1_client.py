@@ -34,9 +34,6 @@ UNIQUE_KEYS = {
     "alert_near": ("anon_key", "restaurant_id"),
     "alert_near_state": ("anon_key",),
     "push_subs": ("token", "channel_id"),
-    # 11/25 먹맵 D1에 고유 인덱스를 걸어 한 문장(ON CONFLICT)으로 넣는다(supabase/d1/20261125_mukmap_db.sql)
-    "processing_queue": ("video_id",),
-    "videos": ("video_id", "restaurant_id"),
 }
 TABLES = {"channels", "restaurants", "videos", "processing_queue",
           "alert_subs", "alert_state", "alert_near", "alert_near_state", "push_subs"}
@@ -416,7 +413,9 @@ class Query:
                 stmts.append((f"INSERT INTO {self.table} ({','.join(cols)}) VALUES ({','.join('?' * len(cols))}) "
                               f"ON CONFLICT({','.join(conflict)}) {action}", vals))
                 continue
-            # UNIQUE_KEYS에 없는 조합: 같은 요청(한 트랜잭션) 안에서 UPDATE 후 없을 때만 INSERT
+            # UNIQUE_KEYS에 없는 조합(processing_queue.video_id, videos.video_id+restaurant_id): 같은 요청(한 트랜잭션) 안에서
+            # UPDATE 후 없을 때만 INSERT. 두 조합엔 고유 인덱스가 있지만(11/25) ON CONFLICT로 바꾸지 않는다:
+            # 일부 칸만 넣는 upsert가 NOT NULL(channel_id 등)에 먼저 걸려 실패한다(11/25 시험)
             key_sql = " AND ".join(f"{_ident(c)} IS ?" for c in conflict)
             key_vals = [_param(row.get(c)) for c in conflict]
             if rest:
