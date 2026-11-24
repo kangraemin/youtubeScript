@@ -18,6 +18,11 @@ set -a
 set +a
 MODE=()
 KEYLINE=$(grep '^MUKMAP_ANTHROPIC_API_KEY=' "$HOME/.claude/.env" 2>/dev/null)
+# 키 크레딧이 바닥났다는 표시(cron_mukmap.sh가 6시간마다 다시 시험)가 있으면 구독(claude -p)으로 번역한다.
+# 구독일 땐 주간 사용량 85%를 넘으면 새 묶음을 보내지 않는다
+API_OFF="$HOME/.cache/mukmap-api-off"
+SUBMODE=()
+if [ -f "$API_OFF" ] && [ -n "$(find "$API_OFF" -mmin -360)" ]; then KEYLINE=""; SUBMODE=(--stop-usage 85); fi
 # 하루 합계 상한(달러). 회차 상한만 있으면 매시간 돌아 하루 최대 24배가 된다(11/24 검토)
 DAILY="${MUKMAP_TRANSLATE_DAILY:-3}"
 SPENT_FILE="$HOME/.cache/mukmap-translate-$(date +%F)"
@@ -31,7 +36,7 @@ else
     export "$KEYLINE"
     MODE=(--api --budget "$LEFT")
   fi
-  OUT=$(python3 "$MUKMAP_DIR/scripts/translate_i18n.py" "${MODE[@]}" 1 "$MAX" 2>&1)
+  OUT=$(python3 "$MUKMAP_DIR/scripts/translate_i18n.py" "${MODE[@]}" "${SUBMODE[@]}" 1 "$MAX" 2>&1)
   rc=$?
   echo "$OUT"
   DONE=$(echo "$OUT" | awk '/^done /{n=$2} END{print n+0}')

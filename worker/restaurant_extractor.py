@@ -45,7 +45,8 @@ class ExtractBlocked(ExtractError):
     """로그인 만료·사용 한도처럼 영상과 무관하게 전부 실패하는 경우. 회차를 멈추고 재시도 횟수는 쓰지 않는다."""
 
 
-_BLOCKED = re.compile(r"authenticat|OAuth|log ?in|hit your .*limit|usage limit|rate limit", re.I)
+# 크레딧 부족도 영상과 무관한 막힘이다. 재시도 횟수를 쓰면 키가 바닥난 2주 동안 영상이 영영 버려진다(11/25)
+_BLOCKED = re.compile(r"authenticat|OAuth|log ?in|hit your .*limit|usage limit|rate limit|credit balance", re.I)
 
 
 _CHAIN_LINE = ", ".join(CHAIN_NAMES)
