@@ -50,6 +50,11 @@ FOOD_SLUGS = [
     "higaengs",
     "seoul_namzaa",
     "rawfisheater",
+    # 11/28 사용자 지시: 이 유튜버들이 식당에 간 영상은 나라 상관없이 모은다(일본 가게는 먹맵 kjp_collect.py)
+    "kangnami",
+    "ramen_woongseong",
+    "karami",
+    "seungppa",
 ]
 
 # 영상 너무 많은 별도 채널 (요약 제외, 수집은 함)
@@ -71,6 +76,10 @@ SCREEN_SLUGS = {"jisik_inside", "yonhap_economy", "moneycomics"}
 # title_include: 제목에 이 문자열이 있는 영상만 목록에 넣는다.
 CHANNELS = [
     {"id": "UCehQiKylaW68H_OtRS36wGQ", "slug": "dulcinea_studio",   "name": "둘시네아",            "tab": "videos"},
+    {"id": "UCrAhzG4rf642oTUCpdyo5Vw", "slug": "kangnami",           "name": "동네친구 강나미",     "tab": "videos"},
+    {"id": "UCMSXTsIuYiaHgV6ONd4rnNw", "slug": "ramen_woongseong",   "name": "라멘괴인웅성",        "tab": "videos"},
+    {"id": "UCK44QT7G-cXYfIgm93N93Sg", "slug": "karami",             "name": "카라미",              "tab": "videos"},
+    {"id": "UC1AbNPOrkzCxtiPP4v712Vg", "slug": "seungppa",           "name": "승빠",                "tab": "videos"},
     {"id": "UCfpaSruWW3S4dibonKXENjA", "slug": "tzuyang",            "name": "쯔양",               "tab": "videos"},
     {"id": "UCzgpOnor-MzT-1iflZil2GQ", "slug": "jaesunrang",         "name": "재선랑",             "tab": "videos"},
     {"id": "UC-OAmhcFgX9t_OF6fQ-4B1w", "slug": "kimjjamppong",       "name": "김쨈뽕",            "tab": "videos"},
